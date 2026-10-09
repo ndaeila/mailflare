@@ -503,6 +503,8 @@
 	"apiKeys.mcpOrganize.description": "Mark messages read and move them.",
 	"apiKeys.mcpRequestSend.label": "Request send review",
 	"apiKeys.mcpRequestSend.description": "Propose a send that you must confirm in Mailflare.",
+	"apiKeys.mcpSend.label": "Send without review",
+	"apiKeys.mcpSend.description": "Send email immediately, with no confirmation step in Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "Read calendar",
 	"apiKeys.mcpCalendarRead.description": "List, search, and inspect events and free time.",
 	"apiKeys.mcpCalendarWrite.label": "Manage calendar",

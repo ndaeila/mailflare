@@ -6,7 +6,7 @@ import { agentSendApprovals, messages } from "@/db/schema";
 import { listAccessibleMailboxes } from "@/lib/mailboxes/access";
 import { runEmailTool, EMAIL_TOOL_NAMES, emailToolDescriptions, emailToolSchemas } from "@/lib/agent/tools";
 import { editAgentDraft } from "@/lib/agent/edit-draft";
-import { requestAgentSend, getAgentSendRequest } from "@/lib/agent/approvals/utils";
+import { requestAgentSend, getAgentSendRequest, sendAgentDraftDirect } from "@/lib/agent/approvals/utils";
 import type { EmailToolName } from "@/lib/agent/types";
 import type { McpPrincipal } from "./types";
 import { registerAdminMcpTools } from "./admin-tools";
@@ -61,6 +61,26 @@ export function createMailflareMcpHandler(env: CloudflareEnv, principal: McpPrin
 			}
 			catch (error) { return output({ error: error instanceof Error ? error.message : "Request failed" }, true); }
 		});
+		if (principal.scopes.includes("mcp:send")) {
+		const origin = env.APP_URL || baseUrl;
+		const sendDraft = async (mailboxId: string, draftId: string, expectedRevision: number) => {
+			const [draft] = await getDb(env).select({ mailboxId: messages.mailboxId }).from(messages).where(eq(messages.id, draftId)).limit(1);
+			if (draft?.mailboxId !== mailboxId) return output({ error: "Draft not found" }, true);
+			try { return output(await sendAgentDraftDirect(env, principal.user, draftId, expectedRevision, principal.keyId, origin)); }
+			catch (error) { return output({ error: error instanceof Error ? error.message : "Send failed" }, true); }
+		};
+		server.registerTool("send_draft", { description: "Send an assistant draft immediately, without review in Mailflare. Get draftId and revision from draft_email, draft_reply or update_draft.", inputSchema: z.object({ mailboxId: z.string(), draftId: z.string(), expectedRevision: z.number().int().positive() }) }, async ({ mailboxId, draftId, expectedRevision }) => {
+			if (!principal.mailboxIds.includes(mailboxId)) return output({ error: "Permission denied" }, true);
+			return sendDraft(mailboxId, draftId, expectedRevision);
+		});
+		server.registerTool("send_email", { description: "Compose and send a new email immediately from a mailbox, without review in Mailflare. To reply in a thread, use draft_reply then send_draft.", inputSchema: z.object({ mailboxId: z.string().min(1), ...emailToolSchemas.draft_email.shape }) }, async (args) => {
+			if (!principal.mailboxIds.includes(args.mailboxId)) return output({ error: "Permission denied" }, true);
+			let created: { draftId: string; revision: number };
+			try { created = await runEmailTool({ env, user: principal.user, mailboxId: args.mailboxId, origin: "mcp" }, "draft_email", args) as { draftId: string; revision: number }; }
+			catch (error) { return output({ error: error instanceof Error ? error.message : "Could not compose email" }, true); }
+			return sendDraft(args.mailboxId, created.draftId, created.revision);
+		});
+		}
 		server.registerTool("get_send_request", { description: "Read the status of this key's send review request", inputSchema: z.object({ approvalId: z.string() }) }, async ({ approvalId }) => {
 			if (!principal.scopes.includes("mcp:request-send")) return output({ error: "Permission denied" }, true);
 			const [row] = await getDb(env).select({ keyId: agentSendApprovals.requestKeyId }).from(agentSendApprovals).where(eq(agentSendApprovals.id, approvalId)).limit(1);

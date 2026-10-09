@@ -56,6 +56,14 @@ export async function requestAgentSend(env: CloudflareEnv, user: SessionUser, dr
 	return { approvalId: id, status: "pending_approval", expiresAt, snapshot: payload, reviewUrl: `/agent/review/${id}` };
 }
 
+/** Send an agent draft immediately for a key holding mcp:send. Runs the same
+ * snapshot, validation and audit trail as a reviewed send, then confirms it. */
+export async function sendAgentDraftDirect(env: CloudflareEnv, user: SessionUser, draftId: string, expectedRevision: number, requestKeyId: string, publicOrigin?: string) {
+	const request = await requestAgentSend(env, user, draftId, expectedRevision, requestKeyId);
+	const result = await confirmAgentSend(env, user, request.approvalId, publicOrigin);
+	return { approvalId: request.approvalId, ...result, sent: request.snapshot };
+}
+
 export async function getAgentSendRequest(env: CloudflareEnv, user: SessionUser, approvalId: string) {
 	const [approval] = await getDb(env).select().from(agentSendApprovals).where(and(eq(agentSendApprovals.id, approvalId), eq(agentSendApprovals.userId, user.id))).limit(1);
 	if (!approval) throw new Error("Approval not found");
