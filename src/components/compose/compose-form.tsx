@@ -43,6 +43,7 @@ import { SequencesSheet, SequencesSubmenu } from "@/components/sequences/sequenc
 import { InsertFieldMenu, SequenceEmailEditor } from "@/components/sequences/sequence-email-editor";
 import { MergeFieldInput } from "@/components/sequences/merge-field-input";
 import { TemplatesSheet } from "./templates-sheet";
+import { PHONE_SHEET_GAP, phoneSheetStyle, useVisibleViewportBox } from "./use-keyboard-inset";
 import { TemplateEditorWindow } from "./template-editor";
 import type { ComposeTemplate } from "./template-types";
 import type { RichTextEditorApi } from "./rich-text-editor-types";
@@ -112,6 +113,7 @@ export function ComposeForm({
 	const [templatesSheetOpen, setTemplatesSheetOpen] = useState(false);
 	const [templateEditor, setTemplateEditor] = useState<{ template?: ComposeTemplate; initial?: { subject: string; html: string } } | null>(null);
 	const editorApi = useRef<RichTextEditorApi | null>(null);
+	const phoneBox = useVisibleViewportBox();
 	const formRef = useRef<HTMLFormElement>(null);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const pendingSave = useRef<(() => Promise<void>) | null>(null);
@@ -675,8 +677,9 @@ export function ComposeForm({
 				? "fixed left-1/2 top-1/2 z-50 flex h-[86vh] w-[min(860px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
 				: "fixed bottom-0 right-8 z-40 flex h-[min(520px,calc(100vh-88px))] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-t-lg border border-neutral-200 bg-white shadow-2xl"
 			: "relative flex h-full min-h-[720px] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm";
-	// Phones always get Gmail's full-screen composer, whichever way it was opened.
-	const mobileFrameClass = "max-md:fixed max-md:inset-0 max-md:z-50 max-md:h-dvh max-md:min-h-0 max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0 max-md:shadow-none";
+	// Phones always get Gmail's stacked-card sheet, whichever way the composer was opened: it fills
+	// the visible screen below a small gap where the page behind peeks out.
+	const mobileFrameClass = "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-3 max-md:z-50 max-md:h-auto max-md:min-h-0 max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-[20px] max-md:border-0 max-md:shadow-[0_-2px_12px_rgba(0,0,0,0.12)]";
 
 	function closeComposer() {
 		if (onClose) onClose();
@@ -720,7 +723,13 @@ export function ComposeForm({
 	return (
 		<>
 			{agentReview && <SendReview approvalId={agentReview.approvalId} snapshot={agentReview.snapshot} onClose={() => setAgentReview(null)} onSent={() => { setAgentReview(null); if (onClose) onClose(); else router.push("/sent"); }} />}
-			{mode === "popup" && modalMode && !minimized && <div className="fixed inset-0 z-40 bg-neutral-950/65" aria-hidden="true" />}
+			{mode === "popup" && modalMode && !minimized && <div className="fixed inset-0 z-40 bg-neutral-950/65 max-md:hidden" aria-hidden="true" />}
+			{!minimized && (
+				<div className="md:hidden" aria-hidden="true">
+					<div className="fixed inset-0 z-40 bg-black" />
+					<div className="fixed inset-x-3 z-40 h-8 rounded-t-[18px] bg-neutral-300 dark:bg-neutral-200" style={{ top: (phoneBox?.top ?? 0) + PHONE_SHEET_GAP - 6 }} />
+				</div>
+			)}
 			{toast && (
 				<div
 					role={toast.type === "error" ? "alert" : "status"}
@@ -732,7 +741,7 @@ export function ComposeForm({
 					{toast.message}
 				</div>
 			)}
-			<form onSubmit={onSubmit} className={cn(frameClass, mobileFrameClass)} ref={formRef} role={modalMode && !minimized ? "dialog" : mode === "popup" ? "region" : undefined} aria-modal={modalMode && !minimized || undefined} aria-label={mode === "popup" ? t("compose.dialogLabel") : undefined} onKeyDown={(event) => { if (modalMode && !minimized && event.key === "Escape") { event.preventDefault(); setModalMode(false); } }} onDragEnterCapture={minimized ? undefined : onFileDragEnter} onDragOverCapture={minimized ? undefined : onFileDragOver} onDragLeaveCapture={minimized ? undefined : onFileDragLeave} onDropCapture={minimized ? undefined : onFileDrop}>
+			<form onSubmit={onSubmit} className={cn(frameClass, mobileFrameClass)} style={phoneSheetStyle(phoneBox)} ref={formRef} role={modalMode && !minimized ? "dialog" : mode === "popup" ? "region" : undefined} aria-modal={modalMode && !minimized || undefined} aria-label={mode === "popup" ? t("compose.dialogLabel") : undefined} onKeyDown={(event) => { if (modalMode && !minimized && event.key === "Escape") { event.preventDefault(); setModalMode(false); } }} onDragEnterCapture={minimized ? undefined : onFileDragEnter} onDragOverCapture={minimized ? undefined : onFileDragOver} onDragLeaveCapture={minimized ? undefined : onFileDragLeave} onDropCapture={minimized ? undefined : onFileDrop}>
 				{sequence && editingStep !== null && sequenceSteps[editingStep] && (
 					<div ref={(element) => element?.scrollIntoView({ block: "nearest" })} className="absolute inset-0 z-30" onKeyDown={(event) => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
 						<SequenceEmailEditor

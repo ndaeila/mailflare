@@ -21,7 +21,6 @@ import { EmailHtmlRenderer } from "@/components/messages/email-html-renderer";
 import { sanitizeEmailHtml, sanitizeEditorHtml } from "@/lib/email/html";
 import type { RichTextEditorProps, ToolbarCommand } from "./rich-text-editor-types";
 import { fieldsFromEditorHtml, fieldsToEditorHtml, mergeFieldChipHtml } from "./merge-field-utils";
-import { useKeyboardInset } from "./use-keyboard-inset";
 
 const COMMANDS: ToolbarCommand[] = [
 	{ command: "bold", labelKey: "editor.bold", icon: Bold },
@@ -61,9 +60,9 @@ export function RichTextEditor({
 	const [showQuoted, setShowQuoted] = useState(false);
 	const savedRange = useRef<Range | null>(null);
 	const rootRef = useRef<HTMLDivElement | null>(null);
-	// Phones show the formatting bar only while writing, floating above the keyboard (as Gmail does).
+	// Phones show the formatting bar only while writing. It sits at the top of the editor, under
+	// Subject: above the keyboard it would be covered by Safari's floating address and form bars.
 	const [focused, setFocused] = useState(false);
-	const keyboardInset = useKeyboardInset(focused);
 	const lastRange = useRef<Range | null>(null);
 	const labelRef = useRef(mergeFieldLabel);
 	useLayoutEffect(() => { labelRef.current = mergeFieldLabel; }, [mergeFieldLabel]);
@@ -219,10 +218,9 @@ export function RichTextEditor({
 			{footerContent}
 			<div
 				onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) event.preventDefault(); }}
-				style={focused ? { bottom: keyboardInset + 8 } : undefined}
 				className={cn(
 					"relative flex items-center gap-0.5 border-t border-neutral-100 px-4 py-3",
-					focused && !disabled ? "max-md:fixed max-md:inset-x-2 max-md:z-[70] max-md:flex max-md:gap-1 max-md:overflow-x-auto max-md:rounded-full max-md:border max-md:border-neutral-200 max-md:bg-neutral-100 max-md:py-1.5 max-md:pl-2 max-md:pr-0 max-md:shadow-lg max-md:[scrollbar-width:none]" : "max-md:hidden",
+					focused && !disabled ? "max-md:sticky max-md:top-0 max-md:z-10 max-md:order-first max-md:flex max-md:gap-0.5 max-md:overflow-x-auto max-md:border-b max-md:border-t-0 max-md:bg-white max-md:px-1 max-md:py-1 max-md:[scrollbar-width:none]" : "max-md:hidden",
 				)}
 			>
 				<span className="contents max-md:hidden">{toolbarStart}</span>
@@ -274,7 +272,7 @@ export function RichTextEditor({
 					type="button"
 					aria-label={t("editor.hideFormatting")}
 					onClick={() => { setFocused(false); (document.activeElement as HTMLElement | null)?.blur(); }}
-					className="sticky right-0 ml-auto shrink-0 rounded-full bg-neutral-200 p-2.5 text-neutral-800 shadow-[-8px_0_8px_-2px_var(--color-neutral-100)] md:hidden"
+					className="sticky right-0 ml-auto shrink-0 rounded-full bg-neutral-100 p-2.5 text-neutral-800 shadow-[-10px_0_8px_-2px_var(--color-white)] md:hidden"
 				>
 					<X className="h-5 w-5" />
 				</button>
