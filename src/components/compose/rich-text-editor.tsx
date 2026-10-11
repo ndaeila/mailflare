@@ -174,7 +174,7 @@ export function RichTextEditor({
 			className={cn("flex min-h-0 flex-1 flex-col", className)}
 		>
 			{/* A tap anywhere in the empty space below the text starts writing, as in Gmail. */}
-			<div className="relative min-h-0 flex-1 overflow-y-auto" onClick={(event) => { if (event.target === event.currentTarget && !disabled) focusEditableEnd(editorRef.current); }}>
+			<div className="relative min-h-0 flex-1 overflow-y-auto max-md:flex max-md:flex-col" onClick={(event) => { if (event.target === event.currentTarget && !disabled) focusEditableEnd(editorRef.current); }}>
 				<div
 					ref={editorRef}
 					id={id}
@@ -190,7 +190,10 @@ export function RichTextEditor({
 					onKeyDown={onKeyDown}
 					className={cn(
 						"email-body max-w-none px-4 py-3 text-sm text-neutral-900 outline-none max-md:text-base",
-						"min-h-32 max-md:min-h-full empty:before:pointer-events-none empty:before:text-neutral-400 empty:before:content-[attr(data-placeholder)]",
+						"min-h-32 empty:before:pointer-events-none empty:before:text-neutral-400 empty:before:content-[attr(data-placeholder)]",
+						// Phones: fill the area so a tap anywhere lands on the editor itself; iOS only raises the
+						// keyboard for a tap on the field, not for focus set from code afterwards.
+						!quotedHtml && "max-md:flex-1",
 						disabled && "cursor-not-allowed opacity-60",
 					)}
 				/>
