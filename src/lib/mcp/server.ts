@@ -13,6 +13,7 @@ import type { EmailToolName } from "@/lib/agent/types";
 import type { McpPrincipal } from "./types";
 import { sendAgentDraftDirect } from "@/lib/agent/approvals/utils";
 import { registerAdminMcpTools } from "./admin-tools";
+import { registerSequenceMcpTools } from "@/lib/sequences/mcp-tools";
 import { CALENDAR_TOOL_NAMES, calendarToolDescriptions, calendarToolSchemas, calendarToolScope, runCalendarTool } from "@/lib/calendar/tools";
 
 const scopeByTool: Record<EmailToolName, string> = {
@@ -89,6 +90,7 @@ export function createMailflareMcpHandler(env: CloudflareEnv, principal: McpPrin
 			try { return output(await getAgentSendRequest(env, principal.user, approvalId)); }
 			catch { return output({ error: "Request not found" }, true); }
 		});
+		registerSequenceMcpTools(server, env, principal);
 		if (principal.scopes.includes("mcp:send")) {
 		const origin = env.APP_URL || baseUrl;
 		const sendDraft = async (mailboxId: string, draftId: string, expectedRevision: number) => {

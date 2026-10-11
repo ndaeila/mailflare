@@ -12,14 +12,14 @@ export { SEND_CONDITION_TYPES, buildNoReplyCondition, conditionMatchesReply, isS
  * and returned to Drafts. The claim uses the same conditional update as delivery, so
  * a send already under way is left alone.
  */
-export async function skipConditionalSendsForReply(env: CloudflareEnv, reply: { mailboxId: string; threadId: string | null; fromAddr: string; receivedAt: Date }): Promise<number> {
+export async function skipConditionalSendsForReply(env: CloudflareEnv, reply: { mailboxId: string; threadId: string | null; fromAddr: string; receivedAt: Date }): Promise<{ messageId: string; scheduledAt: Date | null }[]> {
 	const db = getDb(env);
 	const candidates = await db
-		.select({ jobId: outboundJobs.id, messageId: outboundJobs.messageId, condition: outboundJobs.sendCondition })
+		.select({ jobId: outboundJobs.id, messageId: outboundJobs.messageId, condition: outboundJobs.sendCondition, scheduledAt: outboundJobs.scheduledAt })
 		.from(outboundJobs)
 		.innerJoin(messages, eq(messages.id, outboundJobs.messageId))
 		.where(and(eq(outboundJobs.status, "queued"), isNotNull(outboundJobs.sendCondition), eq(messages.mailboxId, reply.mailboxId)));
-	let skipped = 0;
+	const skipped: { messageId: string; scheduledAt: Date | null }[] = [];
 	for (const candidate of candidates) {
 		const condition = parseSendCondition(candidate.condition);
 		if (!condition || !candidate.messageId || !conditionMatchesReply(condition, reply)) continue;
@@ -31,7 +31,7 @@ export async function skipConditionalSendsForReply(env: CloudflareEnv, reply: { 
 			.returning({ id: outboundJobs.id });
 		if (!claimed.length) continue;
 		await db.update(messages).set({ status: "draft" }).where(and(eq(messages.id, candidate.messageId), eq(messages.status, "queued")));
-		skipped += 1;
+		skipped.push({ messageId: candidate.messageId, scheduledAt: candidate.scheduledAt });
 	}
 	return skipped;
 }

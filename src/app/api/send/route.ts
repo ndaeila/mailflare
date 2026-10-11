@@ -11,6 +11,10 @@ import { agentDraftMetadata, messages } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { loadMessageAttachmentContents } from "@/lib/email/attachments";
 import { userOwnsDraft } from "@/app/api/drafts/utils";
+import { joinEmailAddressList } from "@/lib/email/address";
+import { htmlToReadableText } from "@/lib/email/reply-content-utils";
+import { findEnrollmentByPendingDraft, getSequence, relinkPendingStep, startEnrollment, updateSequence } from "@/lib/sequences/service";
+import type { SequenceStepInput } from "@/lib/sequences/types";
 
 export async function POST(request: Request) {
 	const env = getEnv();
@@ -22,7 +26,7 @@ export async function POST(request: Request) {
 		const status = error instanceof RequestBodyTooLargeError ? 413 : 400;
 		return NextResponse.json({ error: "Invalid send request" }, { status });
 	}
-	const { attachments = [], draftId, ...fields } = input;
+	const { attachments = [], draftId, sequence, ...fields } = input;
 	const parsed = sendEmailSchema.omit({ attachments: true }).safeParse(fields);
 	if (!parsed.success) {
 		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -42,12 +46,33 @@ export async function POST(request: Request) {
 	}
 
 	try {
+		if (sequence) {
+			const data = parsed.data;
+			if (sequence.saveOpening && !sequence.useTemplateOpening) {
+				const current = await getSequence(env, user.id, sequence.sequenceId);
+				await updateSequence(env, user.id, sequence.sequenceId, { steps: [{ ...current.steps[0], subject: data.subject, body: data.text || htmlToReadableText(data.html || "") }, ...current.steps.slice(1)] });
+			}
+			const enrollment = await startEnrollment(env, user.id, {
+				sequenceId: sequence.sequenceId, mailboxId: data.mailboxId, from: data.from,
+				to: joinEmailAddressList(data.to), cc: data.cc?.length ? joinEmailAddressList(data.cc) : null,
+				variables: sequence.variables, timeZone: sequence.timeZone,
+				stepOverrides: Object.fromEntries(Object.entries(sequence.stepOverrides ?? {}).map(([key, value]) => [Number(key), value])) as Record<number, SequenceStepInput>,
+				opening: sequence.useTemplateOpening ? null : { subject: data.subject, text: data.text, html: data.html, bcc: data.bcc?.length ? joinEmailAddressList(data.bcc) : null, inReplyTo: data.inReplyTo, references: data.references, threadId: data.threadId },
+				attachments, scheduledAt: data.scheduledAt, openingCondition: data.condition ?? null,
+				publicOrigin: new URL(request.url).origin,
+			});
+			return NextResponse.json({ messageId: enrollment.openingMessageId, scheduled: enrollment.sentSteps === 0, enrollmentId: enrollment.id });
+		}
+		// A sequence step that was cancelled to Drafts by hand keeps its place in the sequence.
+		const pendingStep = draftId ? await findEnrollmentByPendingDraft(env, user.id, draftId) : null;
 		const result = await sendEmail(env, {
 			userId: user.id,
 			...parsed.data,
 			attachments,
+			sequenceStep: pendingStep ?? undefined,
 			publicOrigin: new URL(request.url).origin,
 		});
+		if (pendingStep && result.scheduled) await relinkPendingStep(env, pendingStep.enrollmentId, draftId!, result.messageId);
 		return NextResponse.json(result);
 	} catch (err) {
 		const message = err instanceof Error ? err.message : "Send failed";

@@ -41,6 +41,17 @@ export async function parseSendRequest(request: Request): Promise<SendRequestPay
 		text: getOptionalFormValue(form, "text"),
 		html: getOptionalFormValue(form, "html"),
 		mailboxId: getOptionalFormValue(form, "mailboxId"),
+		sequence: parseSequenceField(getOptionalFormValue(form, "sequence")),
 		attachments,
 	};
+}
+
+function parseSequenceField(value: string | undefined): SendRequestPayload["sequence"] {
+	if (!value) return undefined;
+	try {
+		const parsed = JSON.parse(value) as SendRequestPayload["sequence"];
+		return parsed && typeof parsed.sequenceId === "string" ? parsed : undefined;
+	} catch {
+		return undefined;
+	}
 }

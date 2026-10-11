@@ -40,6 +40,8 @@ export type SendEmailInput = {
 	scheduledAt?: string | Date;
 	/** Only for scheduled sends: "no_reply" skips the send if a recipient replies first. */
 	condition?: SendConditionType | null;
+	/** Set when this email is a step of a sequence enrollment (lib/sequences). */
+	sequenceStep?: { enrollmentId: string; position: number };
 	publicOrigin?: string;
 };
 
@@ -255,6 +257,10 @@ async function deliverEmail(env: CloudflareEnv, delivery: PreparedDelivery): Pro
 			metadata: { to: toAddr, cc: cc.length ? joinEmailAddressList(cc) : undefined, subject: input.subject },
 		});
 	} catch (err) {
+		if (input.sequenceStep) {
+			const { onSequenceStepFailed } = await import("@/lib/sequences/service");
+			await onSequenceStepFailed(env, input.sequenceStep).catch(() => undefined);
+		}
 		const error = err instanceof Error ? err.message : "Send failed";
 		await db.update(messages).set({ status: "failed" }).where(eq(messages.id, messageId));
 		await db
@@ -263,6 +269,12 @@ async function deliverEmail(env: CloudflareEnv, delivery: PreparedDelivery): Pro
 			.where(eq(outboundJobs.id, jobId));
 		await dispatchWebhooks(env, input.userId, "message.failed", { messageId, error });
 		throw err;
+	}
+	if (input.sequenceStep) {
+		// Imported lazily: the sequence runner itself sends through this module.
+		const { onSequenceStepSent } = await import("@/lib/sequences/service");
+		try { await onSequenceStepSent(env, { ...input.sequenceStep, messageId }); }
+		catch (error) { console.error("sequence advance failed", input.sequenceStep.enrollmentId, error); }
 	}
 }
 
