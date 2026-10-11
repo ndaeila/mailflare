@@ -208,9 +208,9 @@ export default function MessageDetailPage() {
         expandedAll={threadExpanded}
         onExpandedAllChange={setThreadExpanded}
       />
-      <article className={clsx("px-6 py-4", !isAnyPanelVisible && "pl-12")}>
+      <article className={clsx("px-3 py-4 sm:px-6", !isAnyPanelVisible && "sm:pl-12")}>
         <div className="w-full">
-          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 pb-5 pl-4">
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 pb-5 sm:pl-4">
             <div className="flex min-w-0 items-start gap-3">
               <ContactAvatar
                 mailboxId={message.mailboxId}
@@ -270,7 +270,7 @@ export default function MessageDetailPage() {
               />
             </div>
           </div>
-          <div className="prose max-w-none pl-16 text-neutral-900">
+          <div className="prose max-w-none text-neutral-900 sm:pl-16">
             {htmlBody ? (
               <EmailHtmlRenderer key={message.id} className="mx-auto" html={htmlBody} />
             ) : (
@@ -287,7 +287,7 @@ export default function MessageDetailPage() {
             ))}
           </div>
           {cloudAttachmentResult.attachments.length > 0 && (
-            <section className="mt-8 border-t border-neutral-100 py-6 pl-16">
+            <section className="mt-8 border-t border-neutral-100 py-6 sm:pl-16">
               <h2 className="mb-3 text-sm font-semibold text-neutral-900">
                 {t("message.cloudFiles", { count: cloudAttachmentResult.attachments.length })}
               </h2>
@@ -316,7 +316,7 @@ export default function MessageDetailPage() {
             </section>
           )}
           {attachments.length > 0 && (
-            <section className="mt-8 border-t border-neutral-100 py-6 pl-16">
+            <section className="mt-8 border-t border-neutral-100 py-6 sm:pl-16">
               <h2 className="mb-3 text-sm font-semibold text-neutral-900">
                 {t("message.attachments", { count: attachments.length })}
               </h2>
