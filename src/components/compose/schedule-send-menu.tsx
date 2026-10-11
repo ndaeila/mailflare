@@ -4,16 +4,18 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useState } from "react";
 import { ChevronDown, X } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { NewTemplateDialog } from "./new-template-dialog";
+import { TemplateEditorWindow } from "./template-editor";
+import type { ComposeTemplate } from "./template-types";
 import { TemplateMenu } from "./template-menu";
 import { formatScheduledSend } from "./schedule-send-utils";
 import { ScheduleSendDialog } from "./schedule-send-dialog";
 import { ScheduledSendIcon } from "@/components/icons/scheduled-send-icon";
 import type { ScheduleSendMenuProps } from "./schedule-send-types";
 
-export function ScheduleSendMenu({ disabled, value, onChange, onScheduleSend, cancelIfReply, mailboxId, from, onApplyTemplate }: ScheduleSendMenuProps) {
+export function ScheduleSendMenu({ disabled, value, onChange, onScheduleSend, cancelIfReply, mailboxId, from, onApplyTemplate, currentEmail }: ScheduleSendMenuProps) {
 	const { t } = useLanguage();
-	const [newTemplateOpen, setNewTemplateOpen] = useState(false);
+	// Template editor: null closed; a template to edit it; "new" with optional starting content.
+	const [templateEditor, setTemplateEditor] = useState<{ template?: ComposeTemplate; initial?: { subject: string; html: string } } | null>(null);
 	const [scheduleOpen, setScheduleOpen] = useState(false);
 
 	return (
@@ -33,7 +35,12 @@ export function ScheduleSendMenu({ disabled, value, onChange, onScheduleSend, ca
 					sideOffset={6}
 					className="z-50 min-w-56 rounded-lg border border-neutral-200 bg-white p-1 text-sm shadow-lg"
 				>
-					<TemplateMenu onApply={onApplyTemplate} onNew={() => setNewTemplateOpen(true)} />
+					<TemplateMenu
+						onApply={onApplyTemplate}
+						onNew={() => setTemplateEditor({})}
+						onEdit={(template) => setTemplateEditor({ template })}
+						onSaveCurrent={currentEmail && (currentEmail.subject.trim() || currentEmail.html.trim()) ? () => setTemplateEditor({ initial: currentEmail }) : undefined}
+					/>
 					<DropdownMenu.Separator className="my-1 h-px bg-neutral-100" />
 					<DropdownMenu.Item
 						onSelect={() => setScheduleOpen(true)}
@@ -55,7 +62,7 @@ export function ScheduleSendMenu({ disabled, value, onChange, onScheduleSend, ca
 			</DropdownMenu.Portal>
 		</DropdownMenu.Root>
 		<ScheduleSendDialog open={scheduleOpen} onOpenChange={setScheduleOpen} onSchedule={onScheduleSend} initialCancelIfReply={cancelIfReply} />
-		<NewTemplateDialog open={newTemplateOpen} onOpenChange={setNewTemplateOpen} mailboxId={mailboxId} from={from} />
+		<TemplateEditorWindow open={!!templateEditor} onOpenChange={(open) => { if (!open) setTemplateEditor(null); }} template={templateEditor?.template} initial={templateEditor?.initial} mailboxId={mailboxId} from={from} />
 		</>
 	);
 }

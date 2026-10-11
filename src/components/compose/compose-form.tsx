@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { ChevronUp, Ellipsis, FileText, Forward, Maximize2, Minimize2, Minus, Paperclip, Reply, Trash2, Undo2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Ellipsis, FileText, Forward, Maximize2, Minimize2, Minus, Paperclip, Reply, SendHorizontal, Trash2, Undo2, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ScheduleSendDialog } from "./schedule-send-dialog";
 import { formatScheduledSendTime } from "@/components/messages/scheduled-send-utils";
@@ -42,6 +42,9 @@ import { SequenceStrip } from "@/components/sequences/sequence-strip";
 import { SequencesSheet, SequencesSubmenu } from "@/components/sequences/sequences-submenu";
 import { InsertFieldMenu, SequenceEmailEditor } from "@/components/sequences/sequence-email-editor";
 import { MergeFieldInput } from "@/components/sequences/merge-field-input";
+import { TemplatesSheet } from "./templates-sheet";
+import { TemplateEditorWindow } from "./template-editor";
+import type { ComposeTemplate } from "./template-types";
 import type { RichTextEditorApi } from "./rich-text-editor-types";
 import { applyOverrides, fieldLabel, renderHtmlFields } from "@/components/sequences/sequence-ui-utils";
 import { getUserTimeZone } from "@/lib/time/utils";
@@ -106,6 +109,8 @@ export function ComposeForm({
 	const [editingStep, setEditingStep] = useState<number | null>(null);
 	const [compareOpen, setCompareOpen] = useState(false);
 	const [sequenceSheetOpen, setSequenceSheetOpen] = useState(false);
+	const [templatesSheetOpen, setTemplatesSheetOpen] = useState(false);
+	const [templateEditor, setTemplateEditor] = useState<{ template?: ComposeTemplate; initial?: { subject: string; html: string } } | null>(null);
 	const editorApi = useRef<RichTextEditorApi | null>(null);
 	const formRef = useRef<HTMLFormElement>(null);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -670,6 +675,47 @@ export function ComposeForm({
 				? "fixed left-1/2 top-1/2 z-50 flex h-[86vh] w-[min(860px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
 				: "fixed bottom-0 right-8 z-40 flex h-[min(520px,calc(100vh-88px))] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-t-lg border border-neutral-200 bg-white shadow-2xl"
 			: "relative flex h-full min-h-[720px] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm";
+	// Phones always get Gmail's full-screen composer, whichever way it was opened.
+	const mobileFrameClass = "max-md:fixed max-md:inset-0 max-md:z-50 max-md:h-dvh max-md:min-h-0 max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0 max-md:shadow-none";
+
+	function closeComposer() {
+		if (onClose) onClose();
+		else router.push("/inbox");
+	}
+
+	function applyTemplate({ title, html: templateHtml }: { title: string; html: string }) {
+		setSubject((current) => current.trim() ? current : title);
+		setHtml((current) => (hasMeaningfulHtml(current) ? `${current}${templateHtml}` : templateHtml));
+	}
+
+	const currentEmail = { subject, html: applyMailboxSignatureHtml(html, selectedMailbox?.signature, "") };
+	const canSaveCurrent = !!(draftPreview.subject || draftPreview.text);
+	const menuItemClass = "flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-neutral-900 outline-none hover:bg-neutral-100 focus:bg-neutral-100 data-[disabled]:opacity-50";
+	const moreMenuItems = (phone: boolean) => (
+		<>
+			<DropdownMenu.Item onSelect={() => setHeaderScheduleOpen(true)} disabled={!fromAddr} className={menuItemClass}>
+				<ScheduledSendIcon className="h-5 w-5" />
+				{t("schedule.send")}
+			</DropdownMenu.Item>
+			{phone && scheduledAt && (
+				<DropdownMenu.Item onSelect={() => setScheduledAt(null)} className={menuItemClass}>
+					<X className="h-5 w-5" />
+					{t("schedule.clear")}
+				</DropdownMenu.Item>
+			)}
+			{phone && (
+				<DropdownMenu.Item onSelect={() => setTemplatesSheetOpen(true)} className={menuItemClass}>
+					<FileText className="h-5 w-5" />
+					{t("template.templates")}
+				</DropdownMenu.Item>
+			)}
+			{agentRevision === null && <SequencesSubmenu onPick={chooseSequence} onOpenSheet={() => setSequenceSheetOpen(true)} disabled={!fromAddr} />}
+			<DropdownMenu.Item onSelect={() => void deleteDraftAndClose()} disabled={deletingDraft} className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-red-600 outline-none hover:bg-red-50 focus:bg-red-50 data-[disabled]:opacity-50">
+				<Trash2 className="h-5 w-5" />
+				{t("compose.discard")}
+			</DropdownMenu.Item>
+		</>
+	);
 
 	return (
 		<>
@@ -686,7 +732,7 @@ export function ComposeForm({
 					{toast.message}
 				</div>
 			)}
-			<form onSubmit={onSubmit} className={frameClass} ref={formRef} role={modalMode && !minimized ? "dialog" : mode === "popup" ? "region" : undefined} aria-modal={modalMode && !minimized || undefined} aria-label={mode === "popup" ? t("compose.dialogLabel") : undefined} onKeyDown={(event) => { if (modalMode && !minimized && event.key === "Escape") { event.preventDefault(); setModalMode(false); } }} onDragEnterCapture={minimized ? undefined : onFileDragEnter} onDragOverCapture={minimized ? undefined : onFileDragOver} onDragLeaveCapture={minimized ? undefined : onFileDragLeave} onDropCapture={minimized ? undefined : onFileDrop}>
+			<form onSubmit={onSubmit} className={cn(frameClass, mobileFrameClass)} ref={formRef} role={modalMode && !minimized ? "dialog" : mode === "popup" ? "region" : undefined} aria-modal={modalMode && !minimized || undefined} aria-label={mode === "popup" ? t("compose.dialogLabel") : undefined} onKeyDown={(event) => { if (modalMode && !minimized && event.key === "Escape") { event.preventDefault(); setModalMode(false); } }} onDragEnterCapture={minimized ? undefined : onFileDragEnter} onDragOverCapture={minimized ? undefined : onFileDragOver} onDragLeaveCapture={minimized ? undefined : onFileDragLeave} onDropCapture={minimized ? undefined : onFileDrop}>
 				{sequence && editingStep !== null && sequenceSteps[editingStep] && (
 					<div ref={(element) => element?.scrollIntoView({ block: "nearest" })} className="absolute inset-0 z-30" onKeyDown={(event) => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
 						<SequenceEmailEditor
@@ -707,7 +753,30 @@ export function ComposeForm({
 						{t("compose.dropFiles")}
 					</div>
 				)}
-				<div className="flex h-9 shrink-0 items-center justify-between bg-neutral-800 text-white dark:bg-neutral-100 px-4 text-sm font-medium">
+				<div className="flex h-14 shrink-0 items-center gap-1 px-2 md:hidden">
+					<button type="button" onClick={closeComposer} aria-label={t("compose.close")} className="rounded-full bg-neutral-100 p-2 text-neutral-700"><X className="h-5 w-5" /></button>
+					<span className="flex-1" />
+					<button type="button" onClick={() => attachmentInput.current?.click()} disabled={loading || loadingDraft} aria-label={t("compose.attachFiles")} className="rounded-full p-2.5 text-neutral-800 disabled:opacity-40"><Paperclip className="h-5.5 w-5.5" /></button>
+					<button
+						type="submit"
+						disabled={loading || loadingDraft || !fromAddr}
+						aria-label={scheduledAt ? t("compose.schedule") : agentRevision !== null ? t("compose.reviewSend") : t("compose.send")}
+						className={cn("rounded-full p-2.5 disabled:opacity-40", to.length > 0 ? "text-blue-600" : "text-neutral-400")}
+					>
+						{scheduledAt ? <ScheduledSendIcon className="h-6 w-6" /> : <SendHorizontal className="h-6 w-6" />}
+					</button>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger type="button" aria-label={t("compose.moreOptions")} disabled={loading || loadingDraft} className="rounded-full p-2.5 text-neutral-800 disabled:opacity-40">
+							<Ellipsis className="h-6 w-6" />
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Portal>
+							<DropdownMenu.Content align="end" sideOffset={6} className="z-[60] min-w-56 rounded-2xl border border-neutral-200 bg-white p-1.5 text-base shadow-xl">
+								{moreMenuItems(true)}
+							</DropdownMenu.Content>
+						</DropdownMenu.Portal>
+					</DropdownMenu.Root>
+				</div>
+				<div className="flex h-9 shrink-0 items-center justify-between bg-neutral-800 text-white dark:bg-neutral-100 px-4 text-sm font-medium max-md:hidden">
 					<span className="flex min-w-0 items-center gap-2 truncate  dark:text-neutral-900">
 						{threading?.inReplyTo && <Reply className="h-3.5 w-3.5 text-neutral-300" />}
 						{!threading?.inReplyTo && /^fwd?:/i.test(subject) && <Forward className="h-3.5 w-3.5 text-neutral-300" />}
@@ -728,15 +797,7 @@ export function ComposeForm({
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Portal>
 							<DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-52 rounded-2xl border border-neutral-200 bg-white p-1.5 text-[15px] shadow-xl">
-								<DropdownMenu.Item onSelect={() => setHeaderScheduleOpen(true)} disabled={!fromAddr} className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-neutral-900 outline-none hover:bg-neutral-100 focus:bg-neutral-100 data-[disabled]:opacity-50">
-									<ScheduledSendIcon className="h-5 w-5" />
-									{t("schedule.send")}
-								</DropdownMenu.Item>
-								{agentRevision === null && <SequencesSubmenu onPick={chooseSequence} onOpenSheet={() => setSequenceSheetOpen(true)} disabled={!fromAddr} />}
-								<DropdownMenu.Item onSelect={() => void deleteDraftAndClose()} disabled={deletingDraft} className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-red-600 outline-none hover:bg-red-50 focus:bg-red-50 data-[disabled]:opacity-50">
-									<Trash2 className="h-5 w-5" />
-									{t("compose.discard")}
-								</DropdownMenu.Item>
+								{moreMenuItems(false)}
 							</DropdownMenu.Content>
 						</DropdownMenu.Portal>
 					</DropdownMenu.Root>
@@ -756,6 +817,15 @@ export function ComposeForm({
 					</div>
 					<ScheduleSendDialog open={headerScheduleOpen} onOpenChange={setHeaderScheduleOpen} onSchedule={(value, options) => void submit(value, options)} initialCancelIfReply={cancelIfReply} />
 					<SequencesSheet open={sequenceSheetOpen} onOpenChange={setSequenceSheetOpen} onPick={chooseSequence} />
+					<TemplatesSheet
+						open={templatesSheetOpen}
+						onOpenChange={setTemplatesSheetOpen}
+						onApply={applyTemplate}
+						onEdit={(template) => setTemplateEditor({ template })}
+						onNew={() => setTemplateEditor({})}
+						onSaveCurrent={canSaveCurrent ? () => setTemplateEditor({ initial: currentEmail }) : undefined}
+					/>
+					<TemplateEditorWindow open={!!templateEditor} onOpenChange={(open) => { if (!open) setTemplateEditor(null); }} template={templateEditor?.template} initial={templateEditor?.initial} mailboxId={selectedMailbox?.id} from={fromAddr} />
 					{sequence && (
 						<>
 							<CompareOpeningsDialog
@@ -778,8 +848,8 @@ export function ComposeForm({
 						<button type="button" onClick={() => setSkippedSend(null)} aria-label={t("compose.close")} className="rounded p-0.5 text-neutral-500 hover:bg-neutral-100"><X className="h-3.5 w-3.5" /></button>
 					</div>
 				)}
-				<div className="border-b border-neutral-100 px-4 py-1 flex flex-row items-center">
-					<Label htmlFor={`${mode}-from`} className="text-sm text-neutral-500">{t("compose.from")}</Label>
+				<div className="border-b border-neutral-100 px-4 py-1 flex flex-row items-center max-md:order-4 max-md:min-h-12">
+					<Label htmlFor={`${mode}-from`} className="text-sm text-neutral-500 max-md:w-12 max-md:text-base">{t("compose.from")}</Label>
 					<Select
 						id={`${mode}-from`}
 						value={selectedMailbox && selectedFrom ? `${selectedMailbox.id}|${selectedFrom}` : ""}
@@ -787,7 +857,7 @@ export function ComposeForm({
 						// placeholder="Select a mailbox first"
 						required
 						disabled={loadingDraft || senderOptions.length === 0}
-						className="h-8 px-0 py-1 text-sm shadow-none focus-visible:ring-0"
+						className="h-8 px-0 py-1 text-sm shadow-none focus-visible:ring-0 max-md:h-10 max-md:appearance-none max-md:text-base"
 						containerClassName="border-0 flex-1"
 					>
 						{senderOptions.length === 0 && <option value="">{t("compose.selectMailboxFirst")}</option>}
@@ -795,9 +865,11 @@ export function ComposeForm({
 							<option key={`${mailbox.id}|${address}`} value={`${mailbox.id}|${address}`}>{address}</option>
 						))}
 					</Select>
+					<ChevronDown className="pointer-events-none -ml-6 h-5 w-5 shrink-0 text-neutral-600 md:hidden" aria-hidden />
 				</div>
 				<RecipientInput
 					id={`${mode}-to`}
+					className="max-md:order-1"
 					label={t("compose.to")}
 					value={to}
 					onChange={setTo}
@@ -823,6 +895,7 @@ export function ComposeForm({
 				{showCc && (
 					<RecipientInput
 						id={`${mode}-cc`}
+						className="max-md:order-2"
 						label={t("compose.cc")}
 						value={cc}
 						onChange={setCc}
@@ -834,6 +907,7 @@ export function ComposeForm({
 				{showBcc && (
 					<RecipientInput
 						id={`${mode}-bcc`}
+						className="max-md:order-3"
 						label={t("compose.bcc")}
 						value={bcc}
 						onChange={setBcc}
@@ -842,10 +916,10 @@ export function ComposeForm({
 						autoFocus={!loadingDraft && bcc.length === 0}
 					/>
 				)}
-				<div className="border-b border-neutral-100 px-4 py-1">
+				<div className="border-b border-neutral-100 px-4 py-1 max-md:order-5">
 					<Label htmlFor={`${mode}-subject`} className="sr-only">{t("compose.subject")}</Label>
 					{sequence ? (
-						<MergeFieldInput id={`${mode}-subject`} value={subject} onChange={setSubject} label={(name) => fieldLabel(name, t)} placeholder={t("compose.subject")} ariaLabel={t("compose.subject")} />
+						<MergeFieldInput id={`${mode}-subject`} value={subject} onChange={setSubject} label={(name) => fieldLabel(name, t)} placeholder={t("compose.subject")} ariaLabel={t("compose.subject")} className="max-md:py-2 max-md:text-base" />
 					) : (
 						<Input
 							id={`${mode}-subject`}
@@ -854,13 +928,14 @@ export function ComposeForm({
 							placeholder={t("compose.subject")}
 							required
 							disabled={loadingDraft}
-							className="h-8 border-0 px-0 py-1 shadow-none focus-visible:ring-0"
+							className="h-8 border-0 px-0 py-1 shadow-none focus-visible:ring-0 max-md:h-10 max-md:text-base"
 						/>
 					)}
 				</div>
 				<Label htmlFor={`${mode}-text`} className="sr-only">{t("compose.body")}</Label>
 				<RichTextEditor
 					id={`${mode}-text`}
+					className="max-md:order-6"
 					value={html}
 					onChange={setHtml}
 					quotedHtml={quotedHtml}
@@ -868,6 +943,7 @@ export function ComposeForm({
 					placeholder={t("compose.bodyPlaceholder")}
 					mergeFieldLabel={sequence ? (name) => fieldLabel(name, t) : undefined}
 					editorApi={editorApi}
+					mobileToolbarExtra={sequence ? <InsertFieldMenu fields={sequence.variables} onInsert={(name) => editorApi.current?.insertField(name)} /> : undefined}
 					footerContent={<>
 						{sequence && (
 							<SequenceStrip
@@ -907,10 +983,8 @@ export function ComposeForm({
 									cancelIfReply={cancelIfReply}
 									mailboxId={selectedMailbox?.id}
 									from={fromAddr}
-									onApplyTemplate={({ title, html: templateHtml }) => {
-										setSubject((current) => current.trim() ? current : title);
-										setHtml((current) => (hasMeaningfulHtml(current) ? `${current}${templateHtml}` : templateHtml));
-									}}
+									onApplyTemplate={applyTemplate}
+									currentEmail={canSaveCurrent ? currentEmail : undefined}
 								/>
 							</div>
 							{sequence && <InsertFieldMenu fields={sequence.variables} onInsert={(name) => editorApi.current?.insertField(name)} />}
