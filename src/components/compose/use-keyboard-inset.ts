@@ -63,6 +63,13 @@ export function usePhoneSheetPosition(
 		if (!enabled || !viewport) return;
 		let frame = 0;
 		let until = 0;
+		// ?vvdebug shows the numbers Safari reports, for checking this on a real device or simulator.
+		let debug: HTMLDivElement | null = null;
+		if (new URLSearchParams(window.location.search).has("vvdebug")) {
+			debug = document.createElement("div");
+			debug.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:9999;background:#000c;color:#0f0;font:11px/1.3 monospace;padding:2px 4px;pointer-events:none;";
+			document.body.appendChild(debug);
+		}
 		const apply = () => {
 			const element = sheet.current;
 			if (!element) return;
@@ -75,6 +82,10 @@ export function usePhoneSheetPosition(
 			const top = viewport.offsetTop;
 			element.style.setProperty("top", `${top + PHONE_SHEET_GAP}px`);
 			element.style.setProperty("height", `${viewport.height - PHONE_SHEET_GAP}px`);
+			if (debug) {
+				const rect = element.getBoundingClientRect();
+				debug.textContent = `vv top ${Math.round(top)} h ${Math.round(viewport.height)} · scrollY ${Math.round(window.scrollY)} · inner ${window.innerHeight} · sheet ${Math.round(rect.top)}–${Math.round(rect.bottom)} · ${document.activeElement?.id || document.activeElement?.tagName}`;
+			}
 			if (cover?.current) {
 				cover.current.style.setProperty("display", top > 2 ? "block" : "none");
 				cover.current.style.setProperty("top", `${top}px`);
@@ -100,6 +111,7 @@ export function usePhoneSheetPosition(
 		query.addEventListener("change", apply);
 		return () => {
 			cancelAnimationFrame(frame);
+			debug?.remove();
 			viewport.removeEventListener("resize", follow);
 			viewport.removeEventListener("scroll", follow);
 			document.removeEventListener("focusin", follow);

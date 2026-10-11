@@ -694,7 +694,7 @@ export function ComposeForm({
 	// the bottom of the screen (white under the keyboard and Safari's bars) below a small gap.
 	// The large downward shadow paints the sheet's colour below its edge, so wherever Safari's
 	// keyboard bars end up there is never a gap of page or black under the sheet.
-	const mobileFrameClass = "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-5 max-md:z-50 max-md:h-auto max-md:min-h-0 max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:rounded-b-none max-md:rounded-t-[14px] max-md:border-0 max-md:shadow-[0_70vh_0_0_var(--color-white)]";
+	const mobileFrameClass = "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-5 max-md:z-50 max-md:h-auto max-md:min-h-0 max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:rounded-b-none max-md:rounded-t-[14px] max-md:border-0 max-md:shadow-[0_calc(100vh+16px)_0_100vh_var(--color-white)]";
 
 	function closeComposer() {
 		if (!onClose) { router.push("/inbox"); return; }
