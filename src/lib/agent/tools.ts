@@ -1,4 +1,5 @@
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { scheduledMessageIds } from "@/lib/email/scheduled";
 import { z } from "zod";
 import { getDb } from "@/db";
 import { agentDraftMetadata, domains, mailboxes, messages } from "@/db/schema";
@@ -125,7 +126,7 @@ export async function runEmailTool(context: AgentToolContext, name: EmailToolNam
 		const conditions = [eq(messages.mailboxId, context.mailboxId)];
 		if (folder === "draft") conditions.push(eq(messages.status, "draft"), eq(messages.userId, context.user.id));
 		else if (folder === "sent") conditions.push(eq(messages.status, "sent"));
-		else if (folder === "scheduled") conditions.push(eq(messages.direction, "outbound"), eq(messages.status, "queued"));
+		else if (folder === "scheduled") conditions.push(eq(messages.direction, "outbound"), eq(messages.status, "queued"), inArray(messages.id, scheduledMessageIds(db)));
 		else if (folder === "inbox") conditions.push(eq(messages.status, "received"), isNull(messages.folderId));
 		else if (folder === "archived" || folder === "trash" || folder === "spam") conditions.push(eq(messages.status, folder));
 		else conditions.push(or(eq(messages.userId, context.user.id), eq(messages.direction, "inbound"))!);

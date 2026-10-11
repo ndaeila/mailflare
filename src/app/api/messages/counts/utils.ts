@@ -9,7 +9,6 @@ export function getMessageFolder(row: MessageCountRow): CountableFolder {
 	if (row.direction === "inbound" && row.status === "received" && !row.folderId) return "inbox";
 	if (row.direction === "outbound" && row.status === "sent") return "sent";
 	if (row.direction === "outbound" && row.status === "draft") return "drafts";
-	if (row.direction === "outbound" && row.status === "queued") return "scheduled";
 	return null;
 }
 

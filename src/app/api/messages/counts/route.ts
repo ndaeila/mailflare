@@ -6,6 +6,7 @@ import { messages } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { buildMessageCounts } from "./utils";
+import { scheduledMessageIds } from "@/lib/email/scheduled";
 import { getMailboxAccessLevel, listAccessibleMailboxIds } from "@/lib/mailboxes/access";
 
 export async function GET(request: Request) {
@@ -58,5 +59,11 @@ export async function GET(request: Request) {
 			messages.snoozedUntil,
 		);
 
-	return NextResponse.json({ counts: buildMessageCounts(rows) });
+	const counts = buildMessageCounts(rows);
+	const [scheduled] = await db
+		.select({ total: count() })
+		.from(messages)
+		.where(and(...conditions, eq(messages.direction, "outbound"), eq(messages.status, "queued"), inArray(messages.id, scheduledMessageIds(db))));
+	counts.folders.scheduled.total = scheduled?.total ?? 0;
+	return NextResponse.json({ counts });
 }

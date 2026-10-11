@@ -2,6 +2,11 @@ import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { messages, outboundJobs } from "@/db/schema";
 
+/** Message IDs with a pending scheduled delivery, for use in `inArray(messages.id, …)`. */
+export function scheduledMessageIds(db: ReturnType<typeof getDb>) {
+	return db.select({ id: outboundJobs.messageId }).from(outboundJobs).where(and(eq(outboundJobs.status, "queued"), isNotNull(outboundJobs.scheduledAt)));
+}
+
 /** Scheduled delivery times for queued outbound messages, keyed by message ID. */
 export async function getScheduledTimes(env: CloudflareEnv, messageIds: string[]): Promise<Map<string, Date>> {
 	const result = new Map<string, Date>();

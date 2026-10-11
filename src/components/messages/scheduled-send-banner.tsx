@@ -1,11 +1,11 @@
 "use client";
 
-import { CalendarClock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/components/language-provider";
 import { formatScheduledSend } from "@/components/compose/schedule-send-utils";
 import { authFetch } from "@/lib/auth/client";
+import { ScheduledSendIcon } from "@/components/icons/scheduled-send-icon";
 
 /** Shown on a queued outbound message: when it will go out, and a Gmail-style "Cancel send"
  * that turns it back into a draft. */
@@ -44,7 +44,7 @@ export function ScheduledSendBanner({ messageId }: { messageId: string }) {
 
 	return (
 		<div className="mx-3 mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-neutral-800 sm:mx-6 sm:ml-16">
-			<CalendarClock className="h-4 w-4 shrink-0 text-blue-600" aria-hidden />
+			<ScheduledSendIcon className="h-4 w-4 shrink-0 text-blue-600" aria-hidden />
 			<span className="min-w-0 flex-1">{t("scheduledSend.banner", { time: formatScheduledSend(scheduledAt) })}</span>
 			<button
 				type="button"

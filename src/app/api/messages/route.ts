@@ -13,7 +13,7 @@ import { buildSearchConditions } from "@/lib/search/conditions";
 import { getRequestTimeZone } from "@/lib/time/utils";
 import { getMessageListColumns, loadConversationPage } from "./utils";
 import type { ListMessage } from "./types";
-import { getScheduledTimes } from "@/lib/email/scheduled";
+import { getScheduledTimes, scheduledMessageIds } from "@/lib/email/scheduled";
 
 export async function GET(request: Request) {
 	const env = getEnv();
@@ -69,6 +69,10 @@ export async function GET(request: Request) {
 	if (status === "received" && !folderId) {
 		conditions.push(isNull(messages.folderId));
 		conditions.push(or(isNull(messages.snoozedUntil), lte(messages.snoozedUntil, new Date()))!);
+	}
+	if (status === "queued") {
+		// Only mail waiting for a send time; an immediate send is queued for a moment too.
+		conditions.push(inArray(messages.id, scheduledMessageIds(db)));
 	}
 	if (starred === "true") {
 		conditions.push(eq(messages.starred, true));
