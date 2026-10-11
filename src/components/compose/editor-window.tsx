@@ -105,7 +105,7 @@ export function EditorWindow({ open, onOpenChange, title, children }: { open: bo
 				closeClassName="hidden"
 				onOpenAutoFocus={(event) => event.preventDefault()}
 				contentRef={contentRef}
-				className="mf-sheet h-[86vh] w-[min(860px,calc(100vw-32px))] overflow-hidden rounded-lg p-0 max-md:inset-x-0 max-md:bottom-0 max-md:top-5 max-md:h-auto max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-[14px] max-md:shadow-[0_70vh_0_0_var(--color-white)]"
+				className="mf-sheet h-[86vh] w-[min(860px,calc(100vw-32px))] overflow-hidden rounded-lg p-0 max-md:inset-x-0 max-md:bottom-0 max-md:top-5 max-md:h-auto max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-[14px] max-md:shadow-[0_calc(100vh+16px)_0_100vh_var(--color-white)]"
 			>
 				<DialogTitle className="sr-only">{title}</DialogTitle>
 				{open && children}
