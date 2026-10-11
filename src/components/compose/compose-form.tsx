@@ -40,7 +40,9 @@ import type { ComposeAttachmentPolicy } from "./attachment-policy-types";
 import { CompareOpeningsDialog } from "@/components/sequences/compare-openings-dialog";
 import { SequenceStrip } from "@/components/sequences/sequence-strip";
 import { SequencesSheet, SequencesSubmenu } from "@/components/sequences/sequences-submenu";
-import { StepDialog } from "@/components/sequences/step-editor";
+import { InsertFieldMenu, SequenceEmailEditor } from "@/components/sequences/sequence-email-editor";
+import { MergeFieldInput } from "@/components/sequences/merge-field-input";
+import type { RichTextEditorApi } from "./rich-text-editor-types";
 import { applyOverrides, fieldLabel, renderHtmlFields } from "@/components/sequences/sequence-ui-utils";
 import { getUserTimeZone } from "@/lib/time/utils";
 import type { SequenceStep, SequenceSummary } from "@/lib/sequences/types";
@@ -104,6 +106,7 @@ export function ComposeForm({
 	const [editingStep, setEditingStep] = useState<number | null>(null);
 	const [compareOpen, setCompareOpen] = useState(false);
 	const [sequenceSheetOpen, setSequenceSheetOpen] = useState(false);
+	const editorApi = useRef<RichTextEditorApi | null>(null);
 	const formRef = useRef<HTMLFormElement>(null);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const pendingSave = useRef<(() => Promise<void>) | null>(null);
@@ -163,9 +166,10 @@ export function ComposeForm({
 		return [...names].filter((name) => !(BUILTIN_VARIABLES as readonly string[]).includes(name) || !recipientBuiltins[name]);
 	}, [sequenceCheckSteps, recipientBuiltins]);
 
+	// Fields stay as chips in the body and are filled in as it sends; the subject shows known names.
 	function fillFromTemplate(opening: SequenceStep) {
 		setSubject(renderTemplate(opening.subject, recipientBuiltins).text);
-		setHtml(applyMailboxSignatureHtml(textToHtml(renderTemplate(opening.body, recipientBuiltins).text), "", selectedMailbox?.signature));
+		setHtml(applyMailboxSignatureHtml(opening.html || textToHtml(opening.body), "", selectedMailbox?.signature));
 	}
 
 	function chooseSequence(next: SequenceSummary) {
@@ -371,6 +375,10 @@ export function ComposeForm({
 		}
 		if (!hasMeaningfulHtml(html) && !quotedHtml) {
 			setToast({ type: "error", message: t("compose.error.emptyBody") });
+			return;
+		}
+		if (sequence && !subject.trim()) {
+			setToast({ type: "error", message: t("sequences.subjectRequired") });
 			return;
 		}
 		if (sequence) {
@@ -679,6 +687,21 @@ export function ComposeForm({
 				</div>
 			)}
 			<form onSubmit={onSubmit} className={frameClass} ref={formRef} role={modalMode && !minimized ? "dialog" : mode === "popup" ? "region" : undefined} aria-modal={modalMode && !minimized || undefined} aria-label={mode === "popup" ? t("compose.dialogLabel") : undefined} onKeyDown={(event) => { if (modalMode && !minimized && event.key === "Escape") { event.preventDefault(); setModalMode(false); } }} onDragEnterCapture={minimized ? undefined : onFileDragEnter} onDragOverCapture={minimized ? undefined : onFileDragOver} onDragLeaveCapture={minimized ? undefined : onFileDragLeave} onDropCapture={minimized ? undefined : onFileDrop}>
+				{sequence && editingStep !== null && sequenceSteps[editingStep] && (
+					<div ref={(element) => element?.scrollIntoView({ block: "nearest" })} className="absolute inset-0 z-30" onKeyDown={(event) => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
+						<SequenceEmailEditor
+							key={editingStep}
+							title={t("sequences.followUpTitle", { number: editingStep })}
+							subtitle={`${sequence.name} · ${t("sequences.day", { day: stepDays(sequenceSteps)[editingStep] })}`}
+							step={sequenceSteps[editingStep]}
+							position={editingStep}
+							fields={sequence.variables}
+							threadSubject={subject}
+							onCancel={() => setEditingStep(null)}
+							onDone={(step) => { setSequenceOverrides((current) => ({ ...current, [editingStep]: step })); setEditingStep(null); }}
+						/>
+					</div>
+				)}
 				{draggingFiles && !minimized && (
 					<div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-blue-400 bg-blue-50/90 text-sm font-medium text-blue-700" aria-hidden="true">
 						{t("compose.dropFiles")}
@@ -743,16 +766,6 @@ export function ComposeForm({
 								variables={sequenceVariables}
 								saveOpening={saveOpening}
 								onChoose={(choice, save) => { if (choice === "template") switchToTemplateOpening(); else setSaveOpening(save); }}
-							/>
-							<StepDialog
-								open={editingStep !== null}
-								onOpenChange={(open) => { if (!open) setEditingStep(null); }}
-								title={t("sequences.followUpTitle", { number: editingStep ?? 1 })}
-								subtitle={editingStep !== null ? `${sequence.name} · ${t("sequences.day", { day: stepDays(sequenceSteps)[editingStep] })} · ${t("sequences.thisPersonOnly")}` : undefined}
-								step={editingStep !== null ? sequenceSteps[editingStep] : null}
-								position={editingStep ?? 1}
-								fields={sequence.variables}
-								onSave={(step) => { if (editingStep !== null) setSequenceOverrides((current) => ({ ...current, [editingStep]: step })); setEditingStep(null); }}
 							/>
 						</>
 					)}
@@ -831,15 +844,19 @@ export function ComposeForm({
 				)}
 				<div className="border-b border-neutral-100 px-4 py-1">
 					<Label htmlFor={`${mode}-subject`} className="sr-only">{t("compose.subject")}</Label>
-					<Input
-						id={`${mode}-subject`}
-						value={subject}
-						onChange={(event) => setSubject(event.target.value)}
-						placeholder={t("compose.subject")}
-						required
-						disabled={loadingDraft}
-						className="h-8 border-0 px-0 py-1 shadow-none focus-visible:ring-0"
-					/>
+					{sequence ? (
+						<MergeFieldInput id={`${mode}-subject`} value={subject} onChange={setSubject} label={(name) => fieldLabel(name, t)} placeholder={t("compose.subject")} ariaLabel={t("compose.subject")} />
+					) : (
+						<Input
+							id={`${mode}-subject`}
+							value={subject}
+							onChange={(event) => setSubject(event.target.value)}
+							placeholder={t("compose.subject")}
+							required
+							disabled={loadingDraft}
+							className="h-8 border-0 px-0 py-1 shadow-none focus-visible:ring-0"
+						/>
+					)}
 				</div>
 				<Label htmlFor={`${mode}-text`} className="sr-only">{t("compose.body")}</Label>
 				<RichTextEditor
@@ -849,6 +866,8 @@ export function ComposeForm({
 					quotedHtml={quotedHtml}
 					disabled={loadingDraft}
 					placeholder={t("compose.bodyPlaceholder")}
+					mergeFieldLabel={sequence ? (name) => fieldLabel(name, t) : undefined}
+					editorApi={editorApi}
 					footerContent={<>
 						{sequence && (
 							<SequenceStrip
@@ -894,6 +913,7 @@ export function ComposeForm({
 									}}
 								/>
 							</div>
+							{sequence && <InsertFieldMenu fields={sequence.variables} onInsert={(name) => editorApi.current?.insertField(name)} />}
 						</>
 					}
 					toolbarEnd={

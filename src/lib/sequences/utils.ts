@@ -27,12 +27,17 @@ export function normalizeStep(raw: SequenceStepInput, index: number): SequenceSt
 	if (subject.length > 500) throw new Error(`${label}: subject is too long`);
 	if (!body) throw new Error(`${label} needs a message`);
 	if (body.length > 40_000) throw new Error(`${label}: message is too long`);
-	return { kind, delayDays, sendTime: index === 0 ? null : sendTime, condition: index === 0 ? "always" : condition, subject: kind === "reply" ? "" : subject, body };
+	const html = typeof raw.html === "string" && raw.html.trim() ? raw.html : null;
+	if (html && html.length > 400_000) throw new Error(`${label}: message is too long`);
+	return { kind, delayDays, sendTime: index === 0 ? null : sendTime, condition: index === 0 ? "always" : condition, subject: kind === "reply" ? "" : subject, body, html };
 }
 
 /** Merges a partial edit into a step and re-validates it. */
 export function applyStepEdit(step: SequenceStep, edit: SequenceStepInput, index: number): SequenceStep {
-	return normalizeStep({ ...step, ...Object.fromEntries(Object.entries(edit).filter(([, value]) => value !== undefined)) }, index);
+	const merged = { ...step, ...Object.fromEntries(Object.entries(edit).filter(([, value]) => value !== undefined)) };
+	// A new plain-text body without new HTML replaces the old rich body too.
+	if (edit.body !== undefined && edit.html === undefined) merged.html = null;
+	return normalizeStep(merged, index);
 }
 
 export function placeholdersIn(text: string): string[] {
@@ -109,4 +114,18 @@ export function replySubject(subject: string | null | undefined): string {
 /** "3 emails · day 0, 4, 10 · stops on reply" */
 export function describeSequence(steps: SequenceStep[]): { emails: number; days: number[]; stopsOnReply: boolean } {
 	return { emails: steps.length, days: stepDays(steps), stopsOnReply: steps.slice(1).some((step) => step.condition === "no_reply") };
+}
+
+const HTML_PLACEHOLDER = /\{\{\s*([a-zA-Z]\w*)\s*\}\}/g;
+
+function escapeHtmlText(value: string): string {
+	return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** Fills {{field}} placeholders in HTML with escaped values; unknown fields are left as typed. */
+export function renderHtmlFields(html: string, variables: Record<string, string>): string {
+	return html.replace(HTML_PLACEHOLDER, (whole, name: string) => {
+		const value = variables[name]?.trim();
+		return value ? escapeHtmlText(value) : whole;
+	});
 }

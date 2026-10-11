@@ -8,7 +8,7 @@ import { normalizeMessageId, parseMessageIdList } from "@/lib/email/threading";
 import { newId } from "@/lib/ids";
 import { normalizeTimeZone } from "@/lib/time/utils";
 import type { EnrollmentStatus, EnrollmentStepView, EnrollmentView, SequenceStats, SequenceStep, SequenceStepInput, SequenceSummary, StartEnrollmentInput } from "./types";
-import { applyStepEdit, builtinVariables, missingVariables, normalizeSequenceSteps, renderTemplate, replySubject, sequenceVariables, stepDays, stepSendTime } from "./utils";
+import { applyStepEdit, builtinVariables, missingVariables, normalizeSequenceSteps, renderHtmlFields, renderTemplate, replySubject, sequenceVariables, stepDays, stepSendTime } from "./utils";
 
 type Db = ReturnType<typeof getDb>;
 type EnrollmentRow = typeof sequenceEnrollments.$inferSelect;
@@ -132,7 +132,7 @@ export async function startEnrollment(env: CloudflareEnv, userId: string, input:
 
 	const subject = opening ? opening.subject : renderTemplate(steps[0].subject, variables).text;
 	const text = opening ? opening.text ?? undefined : renderTemplate(steps[0].body, variables).text;
-	const html = opening ? opening.html ?? (opening.text ? textToHtml(opening.text) : undefined) : textToHtml(text);
+	const html = opening ? opening.html ?? (opening.text ? textToHtml(opening.text) : undefined) : steps[0].html ? renderHtmlFields(steps[0].html, variables) : textToHtml(text);
 	let openingMessageId: string;
 	try {
 		const result = await sendEmail(env, {
@@ -209,7 +209,7 @@ async function scheduleNextStep(env: CloudflareEnv, enrollment: EnrollmentRow, f
 			userId: enrollment.userId, mailboxId: enrollment.mailboxId, from: enrollment.fromAddr,
 			to: enrollment.toAddr, cc: enrollment.ccAddr || undefined,
 			subject: isReply ? replySubject(last?.subject) : renderTemplate(step.subject, variables).text,
-			text, html: textToHtml(text),
+			text, html: step.html ? renderHtmlFields(step.html, variables) : textToHtml(text),
 			inReplyTo: isReply ? lastMessageHeader : null,
 			references: isReply ? references : null,
 			threadId: isReply ? last?.threadId ?? null : null,

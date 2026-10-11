@@ -46,10 +46,4 @@ export function previewText(body: string, max = 140): string {
 	return `${open > cut.lastIndexOf("}}") ? cut.slice(0, open) : cut}…`;
 }
 
-/** Replaces {{field}} in composer HTML with escaped values; unknown fields are left as typed. */
-export function renderHtmlFields(html: string, variables: Record<string, string>): string {
-	return html.replace(/\{\{\s*([a-zA-Z]\w*)\s*\}\}/g, (whole, name: string) => {
-		const value = variables[name]?.trim();
-		return value ? value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") : whole;
-	});
-}
+export { renderHtmlFields } from "@/lib/sequences/utils";

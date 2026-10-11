@@ -73,3 +73,14 @@ test("reply subjects are not doubled", () => {
 	assert.equal(s.replySubject("Hello"), "Re: Hello");
 	assert.equal(s.replySubject("RE: Hello"), "RE: Hello");
 });
+
+test("html bodies get escaped field values and unknown fields stay", () => {
+	assert.equal(s.renderHtmlFields("<div>Hi {{first_name}}, about {{topic}}</div>", { first_name: "A<b>" }), "<div>Hi A&lt;b&gt;, about {{topic}}</div>");
+});
+
+test("a new plain body drops the old rich body", () => {
+	const step = s.normalizeStep({ kind: "reply", delayDays: 2, body: "old", html: "<div>old</div>" }, 1);
+	assert.equal(step.html, "<div>old</div>");
+	assert.equal(s.applyStepEdit(step, { body: "new" }, 1).html, null);
+	assert.equal(s.applyStepEdit(step, { delayDays: 3 }, 1).html, "<div>old</div>");
+});

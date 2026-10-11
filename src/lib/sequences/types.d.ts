@@ -13,7 +13,10 @@ export type SequenceStep = {
 	condition: SequenceStepCondition;
 	/** Ignored for reply steps, which use "Re: " plus the thread's subject. */
 	subject: string;
+	/** Plain-text body; always present, used for previews and the text/plain part. */
 	body: string;
+	/** Rich body from the composer, with {{field}} placeholders. Null for plain-text steps. */
+	html?: string | null;
 };
 
 export type SequenceStats = { active: number; replied: number; finished: number; stopped: number; total: number };

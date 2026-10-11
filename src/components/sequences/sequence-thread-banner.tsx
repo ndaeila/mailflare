@@ -8,7 +8,7 @@ import { formatScheduledSendTime } from "@/components/messages/scheduled-send-ut
 import { authFetch } from "@/lib/auth/client";
 import { getEmailAddress, getEmailDisplayName, getFirstEmailAddressEntry } from "@/lib/email/address";
 import type { EnrollmentView, SequenceStep } from "@/lib/sequences/types";
-import { StepDialog } from "./step-editor";
+import { SequenceEmailWindow } from "./sequence-email-editor";
 
 function firstName(to: string): string {
 	const entry = getFirstEmailAddressEntry(to);
@@ -80,7 +80,7 @@ export function SequenceThreadBanner({ messageId }: { messageId: string }) {
 		return null;
 	}
 	const editable = next?.state === "scheduled" && next.position > 0 ? next : null;
-	const editableStep: SequenceStep | null = editable ? { kind: editable.kind, delayDays: editable.delayDays, sendTime: editable.sendTime, condition: editable.condition, subject: editable.subject, body: editable.body } : null;
+	const editableStep: SequenceStep | null = editable ? { kind: editable.kind, delayDays: editable.delayDays, sendTime: editable.sendTime, condition: editable.condition, subject: editable.subject, body: editable.body, html: editable.html ?? null } : null;
 	return (
 		<div className="mb-2 rounded-lg bg-neutral-100 px-4 py-2.5 text-sm text-neutral-600 sm:mx-6">
 			<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -96,17 +96,17 @@ export function SequenceThreadBanner({ messageId }: { messageId: string }) {
 			</div>
 			{error && !editing && <p role="alert" className="mt-1 pl-8 text-red-600">{error}</p>}
 			{editable && (
-				<StepDialog
-					open={editing}
+				<SequenceEmailWindow
+					open={editing && !!editableStep}
 					onOpenChange={setEditing}
 					title={t("sequences.followUpTitle", { number: editable.position })}
-					subtitle={`${enrollment.sequenceName} · ${who} · ${t("sequences.thisPersonOnly")}`}
-					step={editableStep}
+					subtitle={`${enrollment.sequenceName} · ${t("sequences.onlyFor", { who })}`}
+					step={editableStep!}
 					position={editable.position}
 					fields={Object.keys(enrollment.variables)}
 					busy={busy}
 					error={error}
-					onSave={(step) => void act(() => authFetch(`/api/sequences/enrollments/${enrollment.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ position: editable.position, ...step }) }))}
+					onDone={(step) => void act(() => authFetch(`/api/sequences/enrollments/${enrollment.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ position: editable.position, ...step }) }))}
 				/>
 			)}
 		</div>

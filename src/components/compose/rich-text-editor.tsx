@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import {
 	Bold,
@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { EmailHtmlRenderer } from "@/components/messages/email-html-renderer";
 import { sanitizeEmailHtml, sanitizeEditorHtml } from "@/lib/email/html";
 import type { RichTextEditorProps, ToolbarCommand } from "./rich-text-editor-types";
+import { fieldsFromEditorHtml, fieldsToEditorHtml, mergeFieldChipHtml } from "./merge-field-utils";
 
 const COMMANDS: ToolbarCommand[] = [
 	{ command: "bold", labelKey: "editor.bold", icon: Bold },
@@ -46,6 +47,8 @@ export function RichTextEditor({
 	toolbarStart,
 	toolbarEnd,
 	footerContent,
+	mergeFieldLabel,
+	editorApi,
 }: RichTextEditorProps) {
 	const { t } = useLanguage();
 	const editorRef = useRef<HTMLDivElement | null>(null);
@@ -54,19 +57,26 @@ export function RichTextEditor({
 	const [linkUrl, setLinkUrl] = useState("");
 	const [showQuoted, setShowQuoted] = useState(false);
 	const savedRange = useRef<Range | null>(null);
+	const lastRange = useRef<Range | null>(null);
+	const labelRef = useRef(mergeFieldLabel);
+	useLayoutEffect(() => { labelRef.current = mergeFieldLabel; }, [mergeFieldLabel]);
+	const mergeEnabled = !!mergeFieldLabel;
 
 	// Keep the DOM in step with the value without resetting the caret on every keystroke.
 	useEffect(() => {
 		const element = editorRef.current;
 		if (!element) return;
-		const safeValue = sanitizeEditorHtml(value);
+		const label = labelRef.current;
+		const safeValue = sanitizeEditorHtml(label ? fieldsToEditorHtml(value, label) : value);
 		if (element.innerHTML !== safeValue) element.innerHTML = safeValue;
-	}, [value]);
+	}, [value, mergeEnabled]);
 
 	useEffect(() => {
 		function refresh() {
 			const element = editorRef.current;
 			if (!element || !element.contains(document.activeElement)) return;
+			const selection = window.getSelection();
+			if (selection && selection.rangeCount > 0 && element.contains(selection.anchorNode)) lastRange.current = selection.getRangeAt(0).cloneRange();
 			const next: Record<string, boolean> = {};
 			for (const item of COMMANDS) {
 				if (item.command === "formatBlock") {
@@ -83,8 +93,27 @@ export function RichTextEditor({
 
 	function emit() {
 		// Export validated original resource addresses, never the blocked preview placeholders.
-		onChange(sanitizeEmailHtml(editorRef.current?.innerHTML ?? "", { forOutgoing: true }) ?? "");
+		const html = sanitizeEmailHtml(editorRef.current?.innerHTML ?? "", { forOutgoing: true }) ?? "";
+		onChange(labelRef.current ? fieldsFromEditorHtml(html) : html);
 	}
+
+	useImperativeHandle(editorApi, () => ({
+		insertField(name: string) {
+			const element = editorRef.current;
+			const label = labelRef.current;
+			if (!element || !label) return;
+			element.focus();
+			const selection = window.getSelection();
+			if (lastRange.current && selection && element.contains(lastRange.current.startContainer)) {
+				selection.removeAllRanges();
+				selection.addRange(lastRange.current);
+			}
+			document.execCommand("insertHTML", false, mergeFieldChipHtml(name, label(name)));
+			document.execCommand("insertText", false, " ");
+			emit();
+		},
+	}));
+
 
 	function run(command: string, commandValue?: string) {
 		editorRef.current?.focus();

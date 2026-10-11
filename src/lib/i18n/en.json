@@ -2071,7 +2071,7 @@
 	"sequences.noFollowUps": "No follow-ups",
 	"sequences.holdIfReplied": "Don't send if they've replied",
 	"sequences.holdIfRepliedOn": "Held back once anyone in the thread or a recipient writes back.",
-	"sequences.insertField": "Insert",
+	"sequences.insertField": "Insert field",
 	"sequences.newSequence": "New sequence",
 	"sequences.now": "Now",
 	"sequences.replySubject": "Re: same subject, in the same thread",
@@ -2083,10 +2083,14 @@
 	"sequences.stoppedReplied": "stopped because {who} replied",
 	"sequences.stopsIfReply": "stops if they reply",
 	"sequences.thisEmail": "This email",
-	"sequences.thisPersonOnly": "only for this person",
 	"sequences.untitled": "Untitled sequence",
 	"sequences.field.firstName": "First name",
 	"sequences.field.lastName": "Last name",
 	"sequences.field.name": "Full name",
-	"sequences.field.email": "Email"
+	"sequences.field.email": "Email",
+	"sequences.when": "When",
+	"sequences.onlyIf": "Replies",
+	"sequences.done": "Done",
+	"sequences.onlyFor": "only for {who}",
+	"sequences.subjectRequired": "Add a subject before sending"
 }

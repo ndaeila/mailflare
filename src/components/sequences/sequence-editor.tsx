@@ -11,7 +11,7 @@ import { authFetch } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 import type { EnrollmentView, SequenceStep, SequenceSummary } from "@/lib/sequences/types";
 import { sequenceVariables, stepDays } from "@/lib/sequences/utils";
-import { StepDialog } from "./step-editor";
+import { SequenceEmailWindow } from "./sequence-email-editor";
 import { TemplateText } from "./template-text";
 import { previewText, sequenceStats } from "./sequence-ui-utils";
 
@@ -200,16 +200,19 @@ export function SequenceEditor({ sequenceId }: { sequenceId: string | null }) {
 					)}
 				</div>
 			</div>
-			<StepDialog
-				open={editing !== null}
-				onOpenChange={(open) => { if (!open) setEditing(null); }}
-				title={editing === 0 ? t("sequences.openingEmail") : t("sequences.followUpTitle", { number: editing ?? 1 })}
-				subtitle={name || undefined}
-				step={editing !== null ? steps[editing] ?? null : null}
-				position={editing ?? 0}
-				fields={fields}
-				onSave={(step) => { if (editing !== null) update(steps.map((value, position) => position === editing ? step : value)); setEditing(null); }}
-			/>
+			{editing !== null && steps[editing] && (
+				<SequenceEmailWindow
+					open
+					onOpenChange={(open) => { if (!open) setEditing(null); }}
+					title={editing === 0 ? t("sequences.openingEmail") : t("sequences.followUpTitle", { number: editing })}
+					subtitle={name || undefined}
+					step={steps[editing]}
+					position={editing}
+					fields={fields}
+					threadSubject={steps[0]?.subject}
+					onDone={(step) => { update(steps.map((value, position) => position === editing ? step : value)); setEditing(null); }}
+				/>
+			)}
 		</div>
 	);
 }
