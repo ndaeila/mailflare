@@ -7,7 +7,8 @@ import { listAccessibleMailboxes } from "@/lib/mailboxes/access";
 import { runEmailTool, EMAIL_TOOL_NAMES, emailToolDescriptions, emailToolSchemas } from "@/lib/agent/tools";
 import { editAgentDraft } from "@/lib/agent/edit-draft";
 import { requestAgentSend, getAgentSendRequest } from "@/lib/agent/approvals/utils";
-import { cancelScheduledSend, getScheduledTime } from "@/lib/email/scheduled";
+import { cancelScheduledSend, getScheduledCondition, getScheduledTime } from "@/lib/email/scheduled";
+import { getSkippedSend } from "@/lib/email/send-conditions";
 import type { EmailToolName } from "@/lib/agent/types";
 import type { McpPrincipal } from "./types";
 import { sendAgentDraftDirect } from "@/lib/agent/approvals/utils";
@@ -63,12 +64,14 @@ export function createMailflareMcpHandler(env: CloudflareEnv, principal: McpPrin
 			}
 			catch (error) { return output({ error: error instanceof Error ? error.message : "Request failed" }, true); }
 		});
-		server.registerTool("get_scheduled_send", { description: "Get when a scheduled email (from the scheduled folder) will be sent.", inputSchema: z.object({ mailboxId: z.string(), messageId: z.string() }) }, async ({ mailboxId, messageId }) => {
+		server.registerTool("get_scheduled_send", { description: "Get when a scheduled email (from the scheduled folder) will be sent and whether it is cancelled if they reply. For a send that was skipped because someone replied, returns status \"skipped\" with who replied.", inputSchema: z.object({ mailboxId: z.string(), messageId: z.string() }) }, async ({ mailboxId, messageId }) => {
 			if (!principal.scopes.includes("mcp:read") || !principal.mailboxIds.includes(mailboxId)) return output({ error: "Permission denied" }, true);
 			const db = getDb(env);
 			const [row] = await db.select({ mailboxId: messages.mailboxId, status: messages.status }).from(messages).where(eq(messages.id, messageId)).limit(1);
 			const scheduledAt = row?.mailboxId === mailboxId && row.status === "queued" ? await getScheduledTime(db, messageId) : null;
-			return scheduledAt ? output({ messageId, scheduledAt: scheduledAt.toISOString() }) : output({ error: "Scheduled email not found" }, true);
+			if (scheduledAt) return output({ messageId, scheduledAt: scheduledAt.toISOString(), cancelIfReply: (await getScheduledCondition(db, messageId)) === "no_reply" });
+			const skipped = row?.mailboxId === mailboxId ? (await getSkippedSend(env, [messageId])).get(messageId) : undefined;
+			return skipped ? output({ messageId, status: "skipped", skipped }) : output({ error: "Scheduled email not found" }, true);
 		});
 		server.registerTool("cancel_scheduled_send", { description: "Cancel a scheduled email before it is sent. It returns to Drafts and is not sent.", inputSchema: z.object({ mailboxId: z.string(), messageId: z.string() }) }, async ({ mailboxId, messageId }) => {
 			if (!principal.scopes.includes("mcp:draft") || !principal.mailboxIds.includes(mailboxId)) return output({ error: "Permission denied" }, true);

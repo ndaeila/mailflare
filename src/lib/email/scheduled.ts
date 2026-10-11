@@ -2,6 +2,7 @@ import { and, eq, exists, isNotNull } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { getDb } from "@/db";
 import { messages, outboundJobs } from "@/db/schema";
+import { parseSendCondition } from "./send-conditions";
 
 /** Matches outbound messages whose send job is still waiting for its scheduled time. */
 export function scheduledMessageCondition(db: ReturnType<typeof getDb>): SQL {
@@ -38,4 +39,14 @@ export async function cancelScheduledSend(db: ReturnType<typeof getDb>, messageI
 	if (!deleted.length) return false;
 	await db.update(messages).set({ status: "draft" }).where(and(eq(messages.id, messageId), eq(messages.status, "queued")));
 	return true;
+}
+
+/** The condition type on a message's pending scheduled send, e.g. "no_reply"; null when none. */
+export async function getScheduledCondition(db: ReturnType<typeof getDb>, messageId: string): Promise<string | null> {
+	const [job] = await db
+		.select({ sendCondition: outboundJobs.sendCondition })
+		.from(outboundJobs)
+		.where(and(eq(outboundJobs.messageId, messageId), eq(outboundJobs.status, "queued"), isNotNull(outboundJobs.scheduledAt)))
+		.limit(1);
+	return parseSendCondition(job?.sendCondition)?.type ?? null;
 }

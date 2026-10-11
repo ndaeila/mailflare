@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeft, BriefcaseBusiness, CalendarDays, Sun } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, CalendarDays, Sun, Undo2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { AfternoonSunIcon } from "@/components/icons/scheduled-send-icon";
 import { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -16,6 +17,7 @@ import {
 	parseDateTimeLocal,
 } from "./schedule-send-utils";
 import type { ScheduleQuickOption } from "./schedule-send-utils";
+import type { ScheduleSendOptions } from "./schedule-send-types";
 
 const QUICK_OPTION_UI: Record<ScheduleQuickOption["id"], { icon: LucideIcon; labelKey: TranslationKey }> = {
 	tomorrowMorning: { icon: Sun, labelKey: "schedule.tomorrowMorning" },
@@ -27,10 +29,11 @@ const tileClass = "flex min-h-32 flex-col items-center justify-center gap-2 roun
 
 /** Gmail-style schedule send: three quick picks and "Pick date & time" in a 2×2 grid.
  * Choosing a tile schedules the email immediately. */
-export function ScheduleSendDialog({ open, onOpenChange, onSchedule }: {
+export function ScheduleSendDialog({ open, onOpenChange, onSchedule, initialCancelIfReply = false }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onSchedule: (value: Date) => void;
+	onSchedule: (value: Date, options: ScheduleSendOptions) => void;
+	initialCancelIfReply?: boolean;
 }) {
 	const { t } = useLanguage();
 	const [picking, setPicking] = useState(false);
@@ -43,13 +46,32 @@ export function ScheduleSendDialog({ open, onOpenChange, onSchedule }: {
 	const customDate = customDay && customTime ? parseDateTimeLocal(`${customDay}T${customTime}`) : null;
 	const customValid = !!customDate && isSchedulableTime(customDate);
 
+	const [cancelIfReply, setCancelIfReply] = useState(initialCancelIfReply);
+	const [seenOpen, setSeenOpen] = useState(open);
+	if (open !== seenOpen) {
+		// Reset the switch each time the dialog opens, from the draft's current setting.
+		setSeenOpen(open);
+		if (open) setCancelIfReply(initialCancelIfReply);
+	}
+	const conditionRow = (
+		<label className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-3 hover:bg-neutral-100">
+			<Undo2 className="h-5 w-5 shrink-0 text-[#e8710a] dark:text-[#fcc9a6]" aria-hidden />
+			<span className="min-w-0 flex-1">
+				<span className="block text-[15px] font-medium text-neutral-900">{t("schedule.cancelIfReply")}</span>
+				<span className="block text-xs text-neutral-500">{t("schedule.cancelIfReplyHint")}</span>
+			</span>
+			<Switch checked={cancelIfReply} onCheckedChange={setCancelIfReply} aria-label={t("schedule.cancelIfReply")} />
+		</label>
+	);
+
 	function close(next: boolean) {
 		if (!next) { setPicking(false); setCustomDay(""); setCustomTime("08:00"); }
 		onOpenChange(next);
 	}
 	function choose(value: Date) {
+		const options = { cancelIfReply };
 		close(false);
-		onSchedule(value);
+		onSchedule(value, options);
 	}
 
 	return (
@@ -85,6 +107,7 @@ export function ScheduleSendDialog({ open, onOpenChange, onSchedule }: {
 								/>
 							</label>
 						</div>
+						{conditionRow}
 						<p className="text-center text-xs text-neutral-500">{t("schedule.timeZoneNote", { zone: zoneName })}</p>
 						<div className="flex justify-end gap-2">
 							<button type="button" onClick={() => close(false)} className="rounded-full px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100">
@@ -118,7 +141,8 @@ export function ScheduleSendDialog({ open, onOpenChange, onSchedule }: {
 								<span className="text-[15px] font-medium text-neutral-900">{t("schedule.pickDateTime")}</span>
 							</button>
 						</div>
-						<p className="pt-4 text-center text-xs text-neutral-500">{t("schedule.timeZoneNote", { zone: zoneName })}</p>
+						<div className="mx-1 mt-2 border-t border-neutral-200 pt-2">{conditionRow}</div>
+						<p className="pt-2 text-center text-xs text-neutral-500">{t("schedule.timeZoneNote", { zone: zoneName })}</p>
 					</>
 				)}
 			</DialogContent>

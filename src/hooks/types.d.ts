@@ -29,6 +29,8 @@ export type Message = {
 	snoozedUntil?: string | null;
 	/** When a scheduled send will go out; set on rows in the Scheduled list. */
 	scheduledAt?: string | null;
+	/** Condition on a scheduled send, e.g. "no_reply". */
+	scheduledCondition?: string | null;
 	threadId: string | null;
 	inReplyTo?: string | null;
 	references?: string | null;

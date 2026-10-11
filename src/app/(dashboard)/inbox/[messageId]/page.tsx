@@ -110,7 +110,7 @@ export default function MessageDetailPage() {
     );
   }
 
-  const { message, body, attachments = [], scheduledAt } = data;
+  const { message, body, attachments = [], scheduledAt, scheduledCondition } = data;
   const currentThreadMessage = {
     ...message,
     textBody: body?.textBody ?? null,
@@ -274,7 +274,7 @@ export default function MessageDetailPage() {
               />
             </div>
           </div>
-          {scheduledAt && <div className="sm:pl-10"><ScheduledSendBanner messageId={message.id} scheduledAt={scheduledAt} /></div>}
+          {scheduledAt && <div className="sm:pl-10"><ScheduledSendBanner messageId={message.id} scheduledAt={scheduledAt} condition={scheduledCondition} /></div>}
           <div className="prose max-w-none text-neutral-900 sm:pl-16">
             {htmlBody ? (
               <EmailHtmlRenderer key={message.id} className="mx-auto" html={htmlBody} />

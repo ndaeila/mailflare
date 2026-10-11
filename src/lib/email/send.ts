@@ -1,6 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { messages, outboundJobs } from "@/db/schema";
+import { buildNoReplyCondition } from "@/lib/email/send-conditions";
+import type { SendConditionType } from "@/lib/email/send-conditions-types";
 import { newId } from "@/lib/ids";
 import { buildSnippet } from "@/lib/email/parse";
 import { dispatchWebhooks } from "@/lib/email/webhooks";
@@ -36,6 +38,8 @@ export type SendEmailInput = {
 	attachments?: AttachmentContent[];
 	/** Future delivery time. Values at or before the current time send immediately. */
 	scheduledAt?: string | Date;
+	/** Only for scheduled sends: "no_reply" skips the send if a recipient replies first. */
+	condition?: SendConditionType | null;
 	publicOrigin?: string;
 };
 
@@ -156,6 +160,9 @@ export async function sendEmail(
 			attachments: attachments.map(({ content: _content, ...attachment }) => attachment),
 		}),
 		scheduledAt,
+		sendCondition: scheduledAt && input.condition === "no_reply"
+			? JSON.stringify(buildNoReplyCondition({ threadId: input.threadId ?? null, to, cc }))
+			: null,
 	});
 
 	const delivery: PreparedDelivery = {

@@ -9,7 +9,7 @@ import { clearMessageDetailCache } from "@/lib/messages/detail-cache";
 import { formatScheduledSendTime } from "./scheduled-send-utils";
 
 /** Shown above a scheduled message; cancelling returns it to Drafts. */
-export function ScheduledSendBanner({ messageId, scheduledAt }: { messageId: string; scheduledAt: string }) {
+export function ScheduledSendBanner({ messageId, scheduledAt, condition }: { messageId: string; scheduledAt: string; condition?: string | null }) {
 	const { t } = useLanguage();
 	const router = useRouter();
 	const [cancelling, setCancelling] = useState(false);
@@ -31,7 +31,7 @@ export function ScheduledSendBanner({ messageId, scheduledAt }: { messageId: str
 	return (
 		<div className="mb-2 flex items-center sm:mx-6 gap-3 rounded-lg bg-neutral-100 px-4 py-3 text-sm text-neutral-600">
 			<ScheduledSendIcon className="h-5 w-5 shrink-0 text-neutral-500" />
-			<span className="min-w-0 flex-1">{t("schedule.sendScheduledFor", { when: formatScheduledSendTime(scheduledAt, t) })}</span>
+			<span className="min-w-0 flex-1">{t(condition === "no_reply" ? "schedule.sendScheduledForUnlessReply" : "schedule.sendScheduledFor", { when: formatScheduledSendTime(scheduledAt, t) })}</span>
 			<button
 				type="button"
 				onClick={() => void cancelSend()}

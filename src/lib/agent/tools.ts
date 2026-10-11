@@ -37,6 +37,8 @@ export const emailToolSchemas = {
 		cc: z.string().max(2_000).nullable().optional(), bcc: z.string().max(2_000).nullable().optional(),
 		subject: z.string().max(500).optional(), body: z.string().max(40_000).optional(),
 		scheduledAt: z.string().max(40).nullable().optional(),
+		/** With scheduledAt: skip the send if anyone in the thread or a recipient replies first. */
+		cancelIfReply: z.boolean().optional(),
 		addAttachments: z.array(z.object({ sourceEmailId: id, attachmentId: id })).max(10).optional(),
 		removeAttachmentIds: z.array(id).max(10).optional(),
 	}),
@@ -54,7 +56,7 @@ export const emailToolDescriptions: Record<EmailToolName, string> = {
 	search_emails: "Search email subject and body in this mailbox.",
 	draft_email: "Save a new email draft. This never sends.",
 	draft_reply: "Save a reply draft with recipients and threading derived from the source email. This never sends.",
-	edit_draft: "Update a draft created by the assistant in the selected mailbox. First read it with get_email to get its current revision and attachment IDs. Can change sender, recipients, subject, body, requested schedule, and copy or remove attachments from accessible emails. Use an ISO 8601 send time with timezone offset; null clears it. This never sends or schedules delivery by itself.",
+	edit_draft: "Update a draft created by the assistant in the selected mailbox. First read it with get_email to get its current revision and attachment IDs. Can change sender, recipients, subject, body, requested schedule, and copy or remove attachments from accessible emails. Use an ISO 8601 send time with timezone offset; null clears it. Set cancelIfReply to skip the scheduled send if anyone in the thread or a recipient replies first (for follow-ups). This never sends or schedules delivery by itself.",
 	review_draft_send: "Create a review link for the current assistant draft revision. The user must explicitly confirm before the email is sent or scheduled. This tool never sends or queues an email.",
 	mark_email_read: "Mark an email as read or unread.",
 	move_email: "Move an email to inbox, archive, trash, or spam.",
@@ -143,8 +145,8 @@ export async function runEmailTool(context: AgentToolContext, name: EmailToolNam
 		const row = await ownMessage(context, input.emailId as string);
 		const attachments = await listMessageAttachments(context.env, row.id);
 		const text = (row.textBody || htmlToReadableText(row.htmlBody)).slice(0, 30_000);
-		const [metadata] = row.status === "draft" ? await db.select({ revision: agentDraftMetadata.revision, scheduledAt: agentDraftMetadata.scheduledAt }).from(agentDraftMetadata).where(eq(agentDraftMetadata.draftId, row.id)).limit(1) : [];
-		return { ...publicMessage(row), ...(row.status === "draft" ? { bcc: row.bccAddr, revision: metadata?.revision ?? null, scheduledAt: metadata?.scheduledAt?.toISOString() ?? null } : {}), text, truncated: (row.textBody || row.htmlBody || "").length > 30_000, attachments: attachments.map(({ id, filename, size, type }) => ({ id, filename, size, contentType: type })) };
+		const [metadata] = row.status === "draft" ? await db.select({ revision: agentDraftMetadata.revision, scheduledAt: agentDraftMetadata.scheduledAt, sendCondition: agentDraftMetadata.sendCondition }).from(agentDraftMetadata).where(eq(agentDraftMetadata.draftId, row.id)).limit(1) : [];
+		return { ...publicMessage(row), ...(row.status === "draft" ? { bcc: row.bccAddr, revision: metadata?.revision ?? null, scheduledAt: metadata?.scheduledAt?.toISOString() ?? null, cancelIfReply: metadata?.sendCondition === "no_reply" } : {}), text, truncated: (row.textBody || row.htmlBody || "").length > 30_000, attachments: attachments.map(({ id, filename, size, type }) => ({ id, filename, size, contentType: type })) };
 	}
 	if (name === "get_thread") {
 		const anchor = await ownMessage(context, input.emailId as string);

@@ -23,7 +23,7 @@ async function currentDraft(env: CloudflareEnv, user: SessionUser, draftId: stri
 	return { draft, metadata };
 }
 
-async function snapshot(env: CloudflareEnv, draft: typeof messages.$inferSelect, scheduledAt: Date | null): Promise<{ payload: AgentSendSnapshot; hash: string }> {
+async function snapshot(env: CloudflareEnv, draft: typeof messages.$inferSelect, scheduledAt: Date | null, sendCondition: string | null = null): Promise<{ payload: AgentSendSnapshot; hash: string }> {
 	const db = getDb(env);
 	const rows = await db.select().from(messageAttachments).where(eq(messageAttachments.messageId, draft.id));
 	const attachments: AgentSendSnapshot["attachments"] = [];
@@ -37,7 +37,7 @@ async function snapshot(env: CloudflareEnv, draft: typeof messages.$inferSelect,
 		from: draft.fromAddr, to: draft.toAddr, cc: draft.ccAddr, bcc: draft.bccAddr,
 		subject: draft.subject ?? "", text: draft.textBody, html: draft.htmlBody,
 		inReplyTo: draft.inReplyTo, references: draft.references, threadId: draft.threadId,
-		mailboxId: draft.mailboxId!, scheduledAt: scheduledAt?.toISOString() ?? null, attachments,
+		mailboxId: draft.mailboxId!, scheduledAt: scheduledAt?.toISOString() ?? null, ...(scheduledAt && sendCondition ? { condition: sendCondition } : {}), attachments,
 	};
 	if (!payload.to.trim() || !payload.subject.trim() || !(payload.text?.trim() || payload.html?.trim())) throw new Error("Draft is incomplete");
 	return { payload, hash: await sha256(JSON.stringify(payload)) };
@@ -49,7 +49,7 @@ export async function requestAgentSend(env: CloudflareEnv, user: SessionUser, dr
 	if (metadata.scheduledAt && metadata.scheduledAt.getTime() <= Date.now()) throw new Error("Scheduled time has passed; update the draft before review");
 	const [existing] = await getDb(env).select({ id: agentSendApprovals.id }).from(agentSendApprovals).where(and(eq(agentSendApprovals.draftId, draftId), inArray(agentSendApprovals.status, ["claimed", "sent", "unknown"]))).limit(1);
 	if (existing) throw new Error("This draft has a delivery already in progress or awaiting reconciliation");
-	const { payload, hash } = await snapshot(env, draft, metadata.scheduledAt);
+	const { payload, hash } = await snapshot(env, draft, metadata.scheduledAt, metadata.sendCondition);
 	const id = newId("approval");
 	const expiresAt = new Date(Date.now() + 15 * 60_000);
 	await getDb(env).insert(agentSendApprovals).values({ id, draftId, mailboxId: draft.mailboxId!, userId: user.id, requestKeyId: requestKeyId ?? null, revision: expectedRevision, payloadHash: hash, expiresAt });
@@ -72,7 +72,7 @@ export async function getAgentSendRequest(env: CloudflareEnv, user: SessionUser,
 	if (approval.status === "pending") {
 		try {
 			const { draft, metadata } = await currentDraft(env, user, approval.draftId);
-			const read = await snapshot(env, draft, metadata.scheduledAt);
+			const read = await snapshot(env, draft, metadata.scheduledAt, metadata.sendCondition);
 			stale = metadata.revision !== approval.revision || read.hash !== approval.payloadHash || !!(metadata.scheduledAt && metadata.scheduledAt.getTime() <= Date.now());
 			if (!stale) current = read.payload;
 		} catch { stale = true; }
@@ -90,7 +90,7 @@ export async function confirmAgentSend(env: CloudflareEnv, user: SessionUser, ap
 		throw new Error("Approval expired");
 	}
 	const { draft, metadata } = await currentDraft(env, user, approval.draftId);
-	const current = await snapshot(env, draft, metadata.scheduledAt);
+	const current = await snapshot(env, draft, metadata.scheduledAt, metadata.sendCondition);
 	if (metadata.revision !== approval.revision || current.hash !== approval.payloadHash) throw new Error("Draft changed; review it again");
 	if (metadata.scheduledAt && metadata.scheduledAt.getTime() <= Date.now()) throw new Error("Scheduled time has passed; update the draft before confirming");
 	const claimed = await db.update(agentSendApprovals).set({ status: "claimed", claimedAt: new Date() }).where(and(eq(agentSendApprovals.id, approvalId), eq(agentSendApprovals.status, "pending"))).returning({ id: agentSendApprovals.id });
@@ -103,6 +103,7 @@ export async function confirmAgentSend(env: CloudflareEnv, user: SessionUser, ap
 		inReplyTo: draft.inReplyTo, references: draft.references, threadId: draft.threadId,
 			attachments: await loadMessageAttachmentContents(env, draft.id),
 			scheduledAt: metadata.scheduledAt ?? undefined,
+			condition: metadata.sendCondition === "no_reply" ? "no_reply" : undefined,
 			publicOrigin,
 		});
 		await db.update(agentSendApprovals).set({ status: "sent", messageId: result.messageId }).where(eq(agentSendApprovals.id, approvalId));

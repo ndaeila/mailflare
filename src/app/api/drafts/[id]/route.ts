@@ -13,6 +13,7 @@ import { getDraftSender, userOwnsDraft } from "../utils";
 import { listMessageAttachments } from "@/lib/email/attachments";
 import { deleteMessageWithObjects } from "@/lib/email/message-cleanup";
 import { parseAgentScheduledAt } from "@/lib/agent/schedule";
+import { getSkippedSend } from "@/lib/email/send-conditions";
 
 export async function GET(request: Request, { params }: DraftRouteParams) {
 	const { id } = await params;
@@ -27,7 +28,8 @@ export async function GET(request: Request, { params }: DraftRouteParams) {
 
 	const attachments = await listMessageAttachments(env, id);
 	const [agent] = await db.select().from(agentDraftMetadata).where(eq(agentDraftMetadata.draftId, id)).limit(1);
-	return NextResponse.json({ draft: { ...draft, attachments, agent: agent ? { revision: agent.revision, origin: agent.origin, scheduledAt: agent.scheduledAt?.toISOString() ?? null } : null } });
+	const skippedSend = (await getSkippedSend(env, [id])).get(id) ?? null;
+	return NextResponse.json({ draft: { ...draft, attachments, skippedSend, agent: agent ? { revision: agent.revision, origin: agent.origin, scheduledAt: agent.scheduledAt?.toISOString() ?? null, sendCondition: agent.sendCondition ?? null } : null } });
 }
 
 export async function PATCH(request: Request, { params }: DraftRouteParams) {
@@ -51,6 +53,7 @@ export async function PATCH(request: Request, { params }: DraftRouteParams) {
 	if (agent && input.mailboxId !== agent.mailboxId) {
 		return NextResponse.json({ error: "Agent draft mailbox cannot be changed" }, { status: 409 });
 	}
+	const sendCondition = agent && input.sendCondition !== undefined ? (input.sendCondition === "no_reply" ? "no_reply" : null) : undefined;
 	let scheduledAt: Date | null | undefined;
 	if (agent && input.scheduledAt !== undefined) {
 		try { scheduledAt = parseAgentScheduledAt(input.scheduledAt); }
@@ -77,7 +80,7 @@ export async function PATCH(request: Request, { params }: DraftRouteParams) {
 			htmlBody: html || null,
 		})
 		.where(eq(messages.id, id));
-	await db.update(agentDraftMetadata).set({ revision: sql`${agentDraftMetadata.revision} + 1`, humanEditedAt: new Date(), ...(scheduledAt !== undefined ? { scheduledAt } : {}) }).where(eq(agentDraftMetadata.draftId, id));
+	await db.update(agentDraftMetadata).set({ revision: sql`${agentDraftMetadata.revision} + 1`, humanEditedAt: new Date(), ...(scheduledAt !== undefined ? { scheduledAt } : {}), ...(sendCondition !== undefined ? { sendCondition } : {}) }).where(eq(agentDraftMetadata.draftId, id));
 
 	return NextResponse.json({ draft: { id } });
 }

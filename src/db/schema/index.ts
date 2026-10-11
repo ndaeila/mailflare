@@ -378,8 +378,10 @@ export const outboundJobs = sqliteTable("outbound_jobs", {
 		.notNull()
 		.references(() => users.id, { onDelete: "cascade" }),
 	messageId: text("message_id").references(() => messages.id, { onDelete: "set null" }),
-	status: text("status", { enum: ["queued", "sending", "sent", "failed"] }).notNull().default("queued"),
+	status: text("status", { enum: ["queued", "sending", "sent", "failed", "skipped"] }).notNull().default("queued"),
 	payload: text("payload").notNull(),
+	/** JSON SendCondition (lib/email/send-conditions-types); null sends unconditionally. */
+	sendCondition: text("send_condition"),
 	error: text("error"),
 	scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
 	createdAt: integer("created_at", { mode: "timestamp" })
@@ -803,6 +805,8 @@ export const agentDraftMetadata = sqliteTable("agent_draft_metadata", {
 	revision: integer("revision").notNull().default(1),
 	humanEditedAt: integer("human_edited_at", { mode: "timestamp" }),
 	scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+	/** Send condition type for the scheduled send, e.g. "no_reply". */
+	sendCondition: text("send_condition"),
 	createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 

@@ -11,7 +11,7 @@ import { ScheduleSendDialog } from "./schedule-send-dialog";
 import { ScheduledSendIcon } from "@/components/icons/scheduled-send-icon";
 import type { ScheduleSendMenuProps } from "./schedule-send-types";
 
-export function ScheduleSendMenu({ disabled, value, onChange, onScheduleSend, mailboxId, from, onApplyTemplate }: ScheduleSendMenuProps) {
+export function ScheduleSendMenu({ disabled, value, onChange, onScheduleSend, cancelIfReply, mailboxId, from, onApplyTemplate }: ScheduleSendMenuProps) {
 	const { t } = useLanguage();
 	const [newTemplateOpen, setNewTemplateOpen] = useState(false);
 	const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -54,7 +54,7 @@ export function ScheduleSendMenu({ disabled, value, onChange, onScheduleSend, ma
 				</DropdownMenu.Content>
 			</DropdownMenu.Portal>
 		</DropdownMenu.Root>
-		<ScheduleSendDialog open={scheduleOpen} onOpenChange={setScheduleOpen} onSchedule={onScheduleSend} />
+		<ScheduleSendDialog open={scheduleOpen} onOpenChange={setScheduleOpen} onSchedule={onScheduleSend} initialCancelIfReply={cancelIfReply} />
 		<NewTemplateDialog open={newTemplateOpen} onOpenChange={setNewTemplateOpen} mailboxId={mailboxId} from={from} />
 		</>
 	);

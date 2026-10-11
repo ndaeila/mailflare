@@ -26,7 +26,7 @@ export function primeMessageDetail(message: Message): void {
 		body: { textBody: message.textBody ?? null, htmlBody: message.htmlBody ?? null },
 		// Scheduled rows carry their send time; without it the reader skips the
 		// scheduled-send banner (and Cancel send) because it trusts this cache.
-		...(message.scheduledAt ? { scheduledAt: message.scheduledAt } : {}),
+		...(message.scheduledAt ? { scheduledAt: message.scheduledAt, scheduledCondition: message.scheduledCondition ?? null } : {}),
 	});
 }
 

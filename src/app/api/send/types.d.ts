@@ -16,4 +16,6 @@ export interface SendRequestPayload {
 	/** Draft whose stored attachments (e.g. forwarded files) should be sent along. */
 	draftId?: string;
 	scheduledAt?: string;
+	/** "no_reply": skip the scheduled send if a recipient replies first. */
+	condition?: "no_reply";
 }

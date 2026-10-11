@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseSendCondition } from "@/lib/email/send-conditions";
 import { eq, desc, and, or, count, isNull, isNotNull, inArray, lte, gt, notInArray, ne, sql, sum } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { getEnv } from "@/lib/cloudflare";
@@ -160,13 +161,16 @@ export async function GET(request: Request) {
 		}
 	}
 	const scheduledAtByMessageId = new Map<string, string>();
+	const scheduledConditionByMessageId = new Map<string, string>();
 	if (scheduled === "true" && rows.length > 0) {
 		const jobs = await db
-			.select({ messageId: outboundJobs.messageId, scheduledAt: outboundJobs.scheduledAt })
+			.select({ messageId: outboundJobs.messageId, scheduledAt: outboundJobs.scheduledAt, sendCondition: outboundJobs.sendCondition })
 			.from(outboundJobs)
 			.where(and(inArray(outboundJobs.messageId, rows.map((row) => row.id)), eq(outboundJobs.status, "queued"), isNotNull(outboundJobs.scheduledAt)));
 		for (const job of jobs) {
 			if (job.messageId && job.scheduledAt) scheduledAtByMessageId.set(job.messageId, job.scheduledAt.toISOString());
+			const condition = parseSendCondition(job.sendCondition)?.type;
+			if (job.messageId && condition) scheduledConditionByMessageId.set(job.messageId, condition);
 		}
 	}
 	const mailboxNameMap = new Map(
@@ -201,6 +205,7 @@ export async function GET(request: Request) {
 			...message,
 			snippet: message.snippet,
 			...(scheduledAtByMessageId.has(message.id) ? { scheduledAt: scheduledAtByMessageId.get(message.id) } : {}),
+			...(scheduledConditionByMessageId.has(message.id) ? { scheduledCondition: scheduledConditionByMessageId.get(message.id) } : {}),
 			fromContactName:
 				(message.direction === "outbound" ? accountName : null) ??
 				contactMap?.get(normalizeEmailAddress(message.fromAddr)) ??

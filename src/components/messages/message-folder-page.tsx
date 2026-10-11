@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent } from "react";
-import { Archive, ChevronLeft, ChevronRight, ListFilter, Mail, MailOpen, Trash2 } from "lucide-react";
+import { Archive, ChevronLeft, ChevronRight, ListFilter, Mail, MailOpen, Trash2, Undo2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -164,6 +164,7 @@ function MessageListRow({
 					<span className="mt-0.5 block truncate text-xs leading-5 text-neutral-500">
 						{preview}
 					</span>
+					{message.scheduledCondition === "no_reply" && <span className="mt-1 block"><IfNoReplyChip label={t("schedule.ifNoReply")} /></span>}
 				</Link>
 			</div>
 		);
@@ -229,6 +230,7 @@ function MessageListRow({
 					aria-current={active ? "true" : undefined}
 					className="focus-visible:outline-none after:absolute after:inset-0"
 				>
+					{message.scheduledCondition === "no_reply" && <IfNoReplyChip label={t("schedule.ifNoReply")} />}
 					<span className={unread ? "font-semibold text-neutral-900" : ""}>
 						{rowMessage.subject ?? t("list.noSubject")}
 					</span>
@@ -609,5 +611,15 @@ export function MessageFolderPage({
 				)}
 			</div>
 		</div>
+	);
+}
+
+/** Marks a scheduled send that is skipped if they reply first. */
+function IfNoReplyChip({ label }: { label: string }) {
+	return (
+		<span className="mr-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 align-middle text-[11px] font-semibold text-blue-700">
+			<Undo2 className="h-3 w-3" aria-hidden />
+			{label}
+		</span>
 	);
 }

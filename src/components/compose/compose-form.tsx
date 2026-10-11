@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { ChevronUp, Ellipsis, FileText, Forward, Maximize2, Minimize2, Minus, Paperclip, Reply, Trash2, X } from "lucide-react";
+import { ChevronUp, Ellipsis, FileText, Forward, Maximize2, Minimize2, Minus, Paperclip, Reply, Trash2, Undo2, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ScheduleSendDialog } from "./schedule-send-dialog";
+import { formatScheduledSendTime } from "@/components/messages/scheduled-send-utils";
+import type { ScheduleSendOptions } from "./schedule-send-types";
 import { ScheduledSendIcon } from "@/components/icons/scheduled-send-icon";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/language-provider";
@@ -15,7 +17,7 @@ import { Select } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
 import { authFetch } from "@/lib/auth/client";
-import { formatEmailAddress, getEmailAddress } from "@/lib/email/address";
+import { formatEmailAddress, getEmailAddress, getEmailDisplayName } from "@/lib/email/address";
 import { useCompose } from "@/components/compose/compose-context";
 import { cn } from "@/lib/utils";
 import { SendReview } from "@/components/agent/send-review";
@@ -77,6 +79,8 @@ export function ComposeForm({
 	const [loadingDraft, setLoadingDraft] = useState(false);
 	const [deletingDraft, setDeletingDraft] = useState(false);
 	const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
+	const [cancelIfReply, setCancelIfReply] = useState(false);
+	const [skippedSend, setSkippedSend] = useState<{ from: string; at: string } | null>(null);
 	const [loadedDraftMailboxId, setLoadedDraftMailboxId] = useState<string | null>(null);
 	const [loadedDraftFrom, setLoadedDraftFrom] = useState<string | null>(null);
 	const [selectedFrom, setSelectedFrom] = useState("");
@@ -145,6 +149,8 @@ export function ComposeForm({
 				setDraftId(draft.id);
 				setAgentRevision(draft.agent?.revision ?? null);
 				setScheduledAt(draft.agent?.scheduledAt ? new Date(draft.agent.scheduledAt) : null);
+				setCancelIfReply(draft.agent?.sendCondition === "no_reply");
+				setSkippedSend(draft.skippedSend ?? null);
 				setTo(headerToRecipients(draft.toAddr));
 				const draftCc = headerToRecipients(draft.ccAddr);
 				const draftBcc = headerToRecipients(draft.bccAddr);
@@ -267,9 +273,11 @@ export function ComposeForm({
 	}
 
 	/** Sends now, or at `sendAtOverride` when a schedule option was just chosen. */
-	async function submit(sendAtOverride?: Date) {
+	async function submit(sendAtOverride?: Date, options?: ScheduleSendOptions) {
 		const sendAt = sendAtOverride ?? scheduledAt;
+		const withCondition = options ? options.cancelIfReply : cancelIfReply;
 		if (sendAtOverride) setScheduledAt(sendAtOverride);
+		if (options) setCancelIfReply(options.cancelIfReply);
 		if (to.length === 0) {
 			setToast({ type: "error", message: t("compose.error.noRecipient") });
 			return;
@@ -299,7 +307,7 @@ export function ComposeForm({
 					setStoredAttachments((current) => [...current, ...(result.attachments ?? [])]);
 					setAttachments([]);
 				}
-				const updated = await authFetch(`/api/drafts/${draftId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mailboxId: selectedMailbox?.id, from: fromAddr, to: recipientsToHeader(to), cc: recipientsToHeader(cc), bcc: recipientsToHeader(bcc), subject, html: fullHtml, text: htmlToPlainText(fullHtml), inReplyTo: threading?.inReplyTo ?? null, references: threading?.references ?? null, threadId: threading?.threadId ?? null, scheduledAt: sendAt?.toISOString() ?? null }) });
+				const updated = await authFetch(`/api/drafts/${draftId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mailboxId: selectedMailbox?.id, from: fromAddr, to: recipientsToHeader(to), cc: recipientsToHeader(cc), bcc: recipientsToHeader(bcc), subject, html: fullHtml, text: htmlToPlainText(fullHtml), inReplyTo: threading?.inReplyTo ?? null, references: threading?.references ?? null, threadId: threading?.threadId ?? null, scheduledAt: sendAt?.toISOString() ?? null, sendCondition: sendAt && withCondition ? "no_reply" : null }) });
 				if (!updated.ok) throw new Error(t("compose.error.saveForReview"));
 				const current = await fetchDraft(draftId);
 				if (!current.agent) throw new Error(t("compose.error.aiMetadata"));
@@ -330,6 +338,7 @@ export function ComposeForm({
 					threading: threading ?? undefined,
 					draftId,
 					scheduledAt: sendAt,
+					condition: sendAt && withCondition ? "no_reply" : undefined,
 				}),
 			});
 			data = (await res.json()) as { messageId?: string; scheduled?: boolean; error?: string };
@@ -619,9 +628,16 @@ export function ComposeForm({
 						</>
 					)}
 					</div>
-					<ScheduleSendDialog open={headerScheduleOpen} onOpenChange={setHeaderScheduleOpen} onSchedule={(value) => void submit(value)} />
+					<ScheduleSendDialog open={headerScheduleOpen} onOpenChange={setHeaderScheduleOpen} onSchedule={(value, options) => void submit(value, options)} initialCancelIfReply={cancelIfReply} />
 				</div>
 				<div className={cn("flex min-h-0 flex-1 flex-col", minimized && "hidden")}>
+				{skippedSend && (
+					<div role="status" className="flex items-start gap-2 border-b border-neutral-200 bg-blue-50 px-4 py-2.5 text-sm text-neutral-800">
+						<Undo2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" aria-hidden />
+						<span className="min-w-0 flex-1">{t("compose.skippedSend", { from: getEmailDisplayName(skippedSend.from) || getEmailAddress(skippedSend.from) || skippedSend.from, when: formatScheduledSendTime(skippedSend.at, t) })}</span>
+						<button type="button" onClick={() => setSkippedSend(null)} aria-label={t("compose.close")} className="rounded p-0.5 text-neutral-500 hover:bg-neutral-100"><X className="h-3.5 w-3.5" /></button>
+					</div>
+				)}
 				<div className="border-b border-neutral-100 px-4 py-1 flex flex-row items-center">
 					<Label htmlFor={`${mode}-from`} className="text-sm text-neutral-500">{t("compose.from")}</Label>
 					<Select
@@ -722,7 +738,8 @@ export function ComposeForm({
 									disabled={loading || loadingDraft || !fromAddr}
 									value={scheduledAt}
 									onChange={setScheduledAt}
-									onScheduleSend={(value) => void submit(value)}
+									onScheduleSend={(value, options) => void submit(value, options)}
+									cancelIfReply={cancelIfReply}
 									mailboxId={selectedMailbox?.id}
 									from={fromAddr}
 									onApplyTemplate={({ title, html: templateHtml }) => {

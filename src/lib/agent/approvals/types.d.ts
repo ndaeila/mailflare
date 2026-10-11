@@ -11,5 +11,7 @@ export type AgentSendSnapshot = {
 	threadId: string | null;
 	mailboxId: string;
 	scheduledAt: string | null;
+	/** Present only when the scheduled send has a condition, e.g. "no_reply". */
+	condition?: string;
 	attachments: { id: string; filename: string; size: number; digest: string }[];
 };
