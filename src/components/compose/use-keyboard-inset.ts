@@ -86,7 +86,7 @@ export function usePhoneSheetPosition(
 			element.style.setProperty("height", `${viewport.height - PHONE_SHEET_GAP}px`);
 			if (debug) {
 				const rect = element.getBoundingClientRect();
-				debug.style.setProperty("top", `${top}px`);
+				debug.style.setProperty("top", `${top + viewport.height - 30}px`);
 				debug.textContent = `vv top ${Math.round(top)} h ${Math.round(viewport.height)} · scrollY ${Math.round(window.scrollY)} · inner ${window.innerHeight} · sheet ${Math.round(rect.top)}–${Math.round(rect.bottom)} · ${document.activeElement?.id || document.activeElement?.tagName}`;
 			}
 			if (cover?.current) {
