@@ -266,7 +266,6 @@
 	"template.delete": "Delete template",
 	"template.new": "New template",
 	"template.title": "Title",
-	"template.content": "Content",
 	"template.saving": "Saving…",
 	"template.save": "Save template",
 	"template.saveFailed": "Could not save template",
@@ -2092,5 +2091,10 @@
 	"sequences.onlyIf": "Replies",
 	"sequences.done": "Done",
 	"sequences.onlyFor": "only for {who}",
-	"sequences.subjectRequired": "Add a subject before sending"
+	"sequences.subjectRequired": "Add a subject before sending",
+	"editor.hideFormatting": "Hide formatting",
+	"template.edit": "Edit template",
+	"template.required": "Add a subject and a message",
+	"template.saveCurrent": "Save this email as a template",
+	"template.templates": "Templates"
 }

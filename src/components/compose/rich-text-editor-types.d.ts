@@ -17,6 +17,8 @@ export type RichTextEditorProps = {
 	mergeFieldLabel?: (name: string) => string;
 	/** Filled with editor commands the parent can call, e.g. inserting a merge field at the caret. */
 	editorApi?: React.MutableRefObject<RichTextEditorApi | null>;
+	/** Extra buttons for the phone formatting bar (toolbarStart/End are desktop-only there). */
+	mobileToolbarExtra?: React.ReactNode;
 };
 
 export type RichTextEditorApi = {

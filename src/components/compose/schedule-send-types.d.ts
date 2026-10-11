@@ -15,6 +15,8 @@ export type ScheduleSendMenuProps = {
 	mailboxId?: string | null;
 	from: string;
 	onApplyTemplate: (template: { title: string; html: string }) => void;
+	/** The email being written, for "Save this email as a template". */
+	currentEmail?: { subject: string; html: string };
 };
 
 export type ScheduleSendOptions = {

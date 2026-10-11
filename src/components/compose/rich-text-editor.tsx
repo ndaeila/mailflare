@@ -12,6 +12,7 @@ import {
 	RemoveFormatting,
 	Strikethrough,
 	Underline,
+	X,
 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -20,6 +21,7 @@ import { EmailHtmlRenderer } from "@/components/messages/email-html-renderer";
 import { sanitizeEmailHtml, sanitizeEditorHtml } from "@/lib/email/html";
 import type { RichTextEditorProps, ToolbarCommand } from "./rich-text-editor-types";
 import { fieldsFromEditorHtml, fieldsToEditorHtml, mergeFieldChipHtml } from "./merge-field-utils";
+import { useKeyboardInset } from "./use-keyboard-inset";
 
 const COMMANDS: ToolbarCommand[] = [
 	{ command: "bold", labelKey: "editor.bold", icon: Bold },
@@ -49,6 +51,7 @@ export function RichTextEditor({
 	footerContent,
 	mergeFieldLabel,
 	editorApi,
+	mobileToolbarExtra,
 }: RichTextEditorProps) {
 	const { t } = useLanguage();
 	const editorRef = useRef<HTMLDivElement | null>(null);
@@ -57,6 +60,10 @@ export function RichTextEditor({
 	const [linkUrl, setLinkUrl] = useState("");
 	const [showQuoted, setShowQuoted] = useState(false);
 	const savedRange = useRef<Range | null>(null);
+	const rootRef = useRef<HTMLDivElement | null>(null);
+	// Phones show the formatting bar only while writing, floating above the keyboard (as Gmail does).
+	const [focused, setFocused] = useState(false);
+	const keyboardInset = useKeyboardInset(focused);
 	const lastRange = useRef<Range | null>(null);
 	const labelRef = useRef(mergeFieldLabel);
 	useLayoutEffect(() => { labelRef.current = mergeFieldLabel; }, [mergeFieldLabel]);
@@ -165,7 +172,12 @@ export function RichTextEditor({
 	}
 
 	return (
-		<div className={cn("flex min-h-0 flex-1 flex-col", className)}>
+		<div
+			ref={rootRef}
+			className={cn("flex min-h-0 flex-1 flex-col", className)}
+			onFocus={() => setFocused(true)}
+			onBlur={(event) => { if (!rootRef.current?.contains(event.relatedTarget as Node | null)) setFocused(false); }}
+		>
 			<div className="relative min-h-0 flex-1 overflow-y-auto">
 				<div
 					ref={editorRef}
@@ -181,7 +193,7 @@ export function RichTextEditor({
 					onPaste={onPaste}
 					onKeyDown={onKeyDown}
 					className={cn(
-						"email-body max-w-none px-4 py-3 text-sm text-neutral-900 outline-none",
+						"email-body max-w-none px-4 py-3 text-sm text-neutral-900 outline-none max-md:text-base",
 						"min-h-32 empty:before:pointer-events-none empty:before:text-neutral-400 empty:before:content-[attr(data-placeholder)]",
 						disabled && "cursor-not-allowed opacity-60",
 					)}
@@ -205,8 +217,16 @@ export function RichTextEditor({
 				)}
 			</div>
 			{footerContent}
-			<div className="relative flex items-center gap-0.5 border-t border-neutral-100 px-4 py-3">
-				{toolbarStart}
+			<div
+				onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) event.preventDefault(); }}
+				style={focused ? { bottom: keyboardInset + 8 } : undefined}
+				className={cn(
+					"relative flex items-center gap-0.5 border-t border-neutral-100 px-4 py-3",
+					focused && !disabled ? "max-md:fixed max-md:inset-x-2 max-md:z-[70] max-md:flex max-md:gap-1 max-md:overflow-x-auto max-md:rounded-full max-md:border max-md:border-neutral-200 max-md:bg-neutral-100 max-md:py-1.5 max-md:pl-2 max-md:pr-0 max-md:shadow-lg max-md:[scrollbar-width:none]" : "max-md:hidden",
+				)}
+			>
+				<span className="contents max-md:hidden">{toolbarStart}</span>
+				{mobileToolbarExtra && <span className="contents md:hidden">{mobileToolbarExtra}</span>}
 				{COMMANDS.map((item) => (
 					<Tooltip key={item.command} label={t(item.labelKey)}>
 						<button
@@ -217,11 +237,11 @@ export function RichTextEditor({
 							onMouseDown={(event) => event.preventDefault()}
 							onClick={() => run(item.command, item.value)}
 							className={cn(
-								"rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900",
+								"shrink-0 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 max-md:rounded-full max-md:p-2.5 max-md:text-neutral-800",
 								active[item.command] && "bg-neutral-200 text-neutral-900",
 							)}
 						>
-							<item.icon className="h-4 w-4" />
+							<item.icon className="h-4 w-4 max-md:h-5 max-md:w-5" />
 						</button>
 					</Tooltip>
 				))}
@@ -232,9 +252,9 @@ export function RichTextEditor({
 						disabled={disabled}
 						onMouseDown={(event) => event.preventDefault()}
 						onClick={openLink}
-						className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+						className="shrink-0 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 max-md:rounded-full max-md:p-2.5 max-md:text-neutral-800"
 					>
-						<Link2 className="h-4 w-4" />
+						<Link2 className="h-4 w-4 max-md:h-5 max-md:w-5" />
 					</button>
 				</Tooltip>
 				<Tooltip label={t("editor.clearFormatting")}>
@@ -244,12 +264,20 @@ export function RichTextEditor({
 						disabled={disabled}
 						onMouseDown={(event) => event.preventDefault()}
 						onClick={() => run("removeFormat")}
-						className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+						className="shrink-0 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 max-md:rounded-full max-md:p-2.5 max-md:text-neutral-800"
 					>
-						<RemoveFormatting className="h-4 w-4" />
+						<RemoveFormatting className="h-4 w-4 max-md:h-5 max-md:w-5" />
 					</button>
 				</Tooltip>
-				{toolbarEnd}
+				<span className="contents max-md:hidden">{toolbarEnd}</span>
+				<button
+					type="button"
+					aria-label={t("editor.hideFormatting")}
+					onClick={() => { setFocused(false); (document.activeElement as HTMLElement | null)?.blur(); }}
+					className="sticky right-0 ml-auto shrink-0 rounded-full bg-neutral-200 p-2.5 text-neutral-800 shadow-[-8px_0_8px_-2px_var(--color-neutral-100)] md:hidden"
+				>
+					<X className="h-5 w-5" />
+				</button>
 				{linkOpen && (
 					<form
 						className="absolute bottom-full left-2 z-10 mb-1 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg"

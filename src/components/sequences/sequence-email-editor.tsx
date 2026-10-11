@@ -2,13 +2,11 @@
 
 import { useRef, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowLeft, Braces, Check, Plus, X } from "lucide-react";
+import { Braces, Check, Plus } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { RichTextEditor } from "@/components/compose/rich-text-editor";
+import { EditorShell, EditorWindow, editorRowClass, editorRowLabel } from "@/components/compose/editor-window";
 import type { RichTextEditorApi } from "@/components/compose/rich-text-editor-types";
 import { htmlToPlainText, textToHtml } from "@/components/compose/rich-text-utils";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -18,8 +16,6 @@ import { fieldLabel } from "./sequence-ui-utils";
 import { MergeFieldInput } from "./merge-field-input";
 import { TemplateText } from "./template-text";
 
-const rowClass = "flex min-h-10 shrink-0 items-center gap-3 border-b border-neutral-100 px-4 py-1 text-sm";
-const rowLabel = "w-14 shrink-0 text-neutral-500";
 
 function KindChips({ value, onChange }: { value: "reply" | "new"; onChange: (value: "reply" | "new") => void }) {
 	const { t } = useLanguage();
@@ -122,23 +118,27 @@ export function SequenceEmailEditor({ title, subtitle, step, position, fields = 
 	}
 
 	return (
-		<div className="flex h-full min-h-0 flex-col bg-white">
-			<div className="flex h-9 shrink-0 items-center gap-2 bg-neutral-800 px-2 text-sm font-medium text-white dark:bg-neutral-100">
-				<button type="button" onClick={onCancel} aria-label={t("sequences.back")} className="rounded p-1 text-neutral-300 hover:bg-neutral-700 hover:text-white dark:text-neutral-600 dark:hover:bg-neutral-200"><ArrowLeft className="h-4 w-4" /></button>
-				<span className="min-w-0 flex-1 truncate dark:text-neutral-900">
-					{title}{subtitle && <span className="font-normal text-neutral-300 dark:text-neutral-600"> · {subtitle}</span>}
-				</span>
-				<button type="button" onClick={onCancel} aria-label={t("common.cancel")} className="rounded p-1 text-neutral-300 hover:bg-neutral-700 hover:text-white dark:text-neutral-600 dark:hover:bg-neutral-200"><X className="h-4 w-4" /></button>
-			</div>
-			{error && <p role="alert" className="shrink-0 border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
-			{position > 0 && (
+		<EditorShell
+			id={`sequence-step-${position}`}
+			title={title}
+			subtitle={subtitle}
+			onCancel={onCancel}
+			onDone={done}
+			busy={busy}
+			error={error}
+			html={html}
+			onHtmlChange={setHtml}
+			mergeFieldLabel={label}
+			editorApi={editorApi}
+			toolbarExtra={<InsertFieldMenu fields={fields} onInsert={(name) => editorApi.current?.insertField(name)} />}
+			rows={position > 0 && (
 				<>
-					<div className={rowClass}>
-						<span className={rowLabel}>{t("sequences.sendAs")}</span>
+					<div className={editorRowClass}>
+						<span className={editorRowLabel}>{t("sequences.sendAs")}</span>
 						<KindChips value={kind === "new" ? "new" : "reply"} onChange={setKind} />
 					</div>
-					<div className={cn(rowClass, "flex-wrap gap-y-1.5")}>
-						<span className={rowLabel}>{t("sequences.when")}</span>
+					<div className={cn(editorRowClass, "flex-wrap gap-y-1.5")}>
+						<span className={editorRowLabel}>{t("sequences.when")}</span>
 						<span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-neutral-800">
 							<input
 								type="number"
@@ -155,50 +155,27 @@ export function SequenceEmailEditor({ title, subtitle, step, position, fields = 
 							<input type="time" step={60} aria-label={t("schedule.time")} value={sendTime ?? ""} onChange={(event) => setSendTime(event.target.value || null)} className="h-8 rounded-md border border-neutral-300 bg-transparent px-1.5 outline-none focus:border-blue-600" />
 						</span>
 					</div>
-					<label className={cn(rowClass, "cursor-pointer")}>
-						<span className={rowLabel}>{t("sequences.onlyIf")}</span>
+					<label className={cn(editorRowClass, "cursor-pointer")}>
+						<span className={editorRowLabel}>{t("sequences.onlyIf")}</span>
 						<span className="min-w-0 flex-1 text-neutral-800">{t("sequences.holdIfReplied")}</span>
 						<Switch checked={condition === "no_reply"} onCheckedChange={(on) => setCondition(on ? "no_reply" : "always")} aria-label={t("sequences.holdIfReplied")} />
 					</label>
 				</>
 			)}
-			<div className="shrink-0 border-b border-neutral-100 px-4 py-1">
-				{kind === "reply" ? (
-					<p className="flex h-8 items-center truncate text-sm text-neutral-500">{threadSubject ? <TemplateText text={replySubject(threadSubject)} tags /> : t("sequences.replySubject")}</p>
-				) : (
-					<MergeFieldInput value={subject} onChange={setSubject} label={label} placeholder={t("compose.subject")} ariaLabel={t("compose.subject")} />
-				)}
-			</div>
-			<RichTextEditor
-				id={`sequence-step-${position}`}
-				value={html}
-				onChange={setHtml}
-				placeholder={t("compose.bodyPlaceholder")}
-				mergeFieldLabel={label}
-				editorApi={editorApi}
-				toolbarStart={
-					<>
-						<Button type="button" size="sm" disabled={busy} onClick={done} className="mr-1 px-5">{t("sequences.done")}</Button>
-						<InsertFieldMenu fields={fields} onInsert={(name) => editorApi.current?.insertField(name)} />
-					</>
-				}
-			/>
-		</div>
+			subject={kind === "reply" ? (
+				<p className="flex h-8 items-center truncate text-sm text-neutral-500 max-md:text-base">{threadSubject ? <TemplateText text={replySubject(threadSubject)} tags /> : t("sequences.replySubject")}</p>
+			) : (
+				<MergeFieldInput value={subject} onChange={setSubject} label={label} placeholder={t("compose.subject")} ariaLabel={t("compose.subject")} className="max-md:text-base" />
+			)}
+		/>
 	);
 }
 
-/** The editor in a compose-sized window: centered like the composer's modal mode, full screen on phones. */
+/** The sequence email editor in a compose-sized window. */
 export function SequenceEmailWindow({ open, onOpenChange, ...props }: Omit<React.ComponentProps<typeof SequenceEmailEditor>, "onCancel"> & { open: boolean; onOpenChange: (open: boolean) => void }) {
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent
-				closeClassName="hidden"
-				onOpenAutoFocus={(event) => event.preventDefault()}
-				className="h-[86vh] w-[min(860px,calc(100vw-32px))] overflow-hidden rounded-lg p-0 max-sm:inset-0 max-sm:h-dvh max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none"
-			>
-				<DialogTitle className="sr-only">{props.title}</DialogTitle>
-				{open && <SequenceEmailEditor {...props} onCancel={() => onOpenChange(false)} />}
-			</DialogContent>
-		</Dialog>
+		<EditorWindow open={open} onOpenChange={onOpenChange} title={props.title}>
+			<SequenceEmailEditor {...props} onCancel={() => onOpenChange(false)} />
+		</EditorWindow>
 	);
 }
