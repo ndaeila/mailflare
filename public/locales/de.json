@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "Nachrichten als gelesen markieren und verschieben.",
 	"apiKeys.mcpRequestSend.label": "Versandprüfung anfordern",
 	"apiKeys.mcpRequestSend.description": "Einen Versand vorschlagen, den Sie in Mailflare bestätigen müssen.",
+	"apiKeys.mcpSend.label": "Ohne Prüfung senden",
+	"apiKeys.mcpSend.description": "E-Mails sofort senden, ohne Bestätigung in Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "Kalender lesen",
 	"apiKeys.mcpCalendarRead.description": "Termine und freie Zeiten auflisten, durchsuchen und ansehen.",
 	"apiKeys.mcpCalendarWrite.label": "Kalender verwalten",

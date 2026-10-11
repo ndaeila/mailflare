@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "Marcar mensagens como lidas e movê-las.",
 	"apiKeys.mcpRequestSend.label": "Solicitar revisão de envio",
 	"apiKeys.mcpRequestSend.description": "Propor um envio que tem de confirmar no Mailflare.",
+	"apiKeys.mcpSend.label": "Enviar sem revisão",
+	"apiKeys.mcpSend.description": "Enviar email de imediato, sem passo de confirmação no Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "Ler calendário",
 	"apiKeys.mcpCalendarRead.description": "Listar, pesquisar e inspecionar eventos e horários livres.",
 	"apiKeys.mcpCalendarWrite.label": "Gerir calendário",

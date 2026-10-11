@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "ಸಂದೇಶಗಳನ್ನು ಓದಿದೆ ಎಂದು ಗುರುತಿಸಿ ಮತ್ತು ಸರಿಸಿ.",
 	"apiKeys.mcpRequestSend.label": "ಕಳುಹಿಸುವ ಪರಿಶೀಲನೆಗೆ ವಿನಂತಿಸಿ",
 	"apiKeys.mcpRequestSend.description": "Mailflare ನಲ್ಲಿ ನೀವು ದೃಢೀಕರಿಸಬೇಕಾದ ಕಳುಹಿಸುವಿಕೆಯನ್ನು ಪ್ರಸ್ತಾಪಿಸಿ.",
+	"apiKeys.mcpSend.label": "ಪರಿಶೀಲನೆ ಇಲ್ಲದೆ ಕಳುಹಿಸಿ",
+	"apiKeys.mcpSend.description": "Mailflare ನಲ್ಲಿ ದೃಢೀಕರಣ ಹಂತವಿಲ್ಲದೆ ತಕ್ಷಣ ಇಮೇಲ್ ಕಳುಹಿಸಿ.",
 	"apiKeys.mcpCalendarRead.label": "ಕ್ಯಾಲೆಂಡರ್ ಓದಿ",
 	"apiKeys.mcpCalendarRead.description": "ಈವೆಂಟ್‌ಗಳು ಮತ್ತು ಖಾಲಿ ಸಮಯವನ್ನು ಪಟ್ಟಿ ಮಾಡಿ, ಹುಡುಕಿ ಮತ್ತು ಪರಿಶೀಲಿಸಿ.",
 	"apiKeys.mcpCalendarWrite.label": "ಕ್ಯಾಲೆಂಡರ್ ನಿರ್ವಹಿಸಿ",

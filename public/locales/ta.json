@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "செய்திகளைப் படித்ததாகக் குறித்து நகர்த்தவும்.",
 	"apiKeys.mcpRequestSend.label": "அனுப்பும் மதிப்பாய்வைக் கோரு",
 	"apiKeys.mcpRequestSend.description": "நீங்கள் Mailflare இல் உறுதிசெய்ய வேண்டிய ஓர் அனுப்புதலை முன்மொழியவும்.",
+	"apiKeys.mcpSend.label": "மதிப்பாய்வு இல்லாமல் அனுப்பு",
+	"apiKeys.mcpSend.description": "Mailflare இல் உறுதிப்படுத்தல் இல்லாமல் உடனே மின்னஞ்சல் அனுப்பு.",
 	"apiKeys.mcpCalendarRead.label": "நாட்காட்டியைப் படி",
 	"apiKeys.mcpCalendarRead.description": "நிகழ்வுகளையும் காலி நேரத்தையும் பட்டியலிடவும், தேடவும், ஆராயவும்.",
 	"apiKeys.mcpCalendarWrite.label": "நாட்காட்டியை நிர்வகி",

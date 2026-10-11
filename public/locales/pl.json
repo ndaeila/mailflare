@@ -508,6 +508,8 @@
 	"apiKeys.mcpOrganize.description": "Oznaczaj wiadomości jako przeczytane i przenoś je.",
 	"apiKeys.mcpRequestSend.label": "Prośba o sprawdzenie wysyłki",
 	"apiKeys.mcpRequestSend.description": "Zaproponuj wysyłkę, którą musisz potwierdzić w Mailflare.",
+	"apiKeys.mcpSend.label": "Wysyłaj bez sprawdzania",
+	"apiKeys.mcpSend.description": "Wysyłaj e-maile od razu, bez potwierdzania w Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "Czytanie kalendarza",
 	"apiKeys.mcpCalendarRead.description": "Wyświetlaj, wyszukuj i sprawdzaj wydarzenia oraz wolny czas.",
 	"apiKeys.mcpCalendarWrite.label": "Zarządzanie kalendarzem",

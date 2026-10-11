@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "علامت‌گذاری پیام‌ها به‌عنوان خوانده‌شده و انتقال آن‌ها.",
 	"apiKeys.mcpRequestSend.label": "درخواست بازبینی ارسال",
 	"apiKeys.mcpRequestSend.description": "پیشنهاد ارسالی که باید در Mailflare تأیید کنید.",
+	"apiKeys.mcpSend.label": "ارسال بدون بازبینی",
+	"apiKeys.mcpSend.description": "ارسال فوری ایمیل، بدون مرحله تأیید در Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "خواندن تقویم",
 	"apiKeys.mcpCalendarRead.description": "فهرست کردن، جستجو و بررسی رویدادها و زمان‌های آزاد.",
 	"apiKeys.mcpCalendarWrite.label": "مدیریت تقویم",

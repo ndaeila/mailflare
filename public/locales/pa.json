@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "ਸੁਨੇਹਿਆਂ ਨੂੰ ਪੜ੍ਹਿਆ ਹੋਇਆ ਚਿੰਨ੍ਹਿਤ ਕਰੋ ਅਤੇ ਭੇਜੋ।",
 	"apiKeys.mcpRequestSend.label": "ਭੇਜਣ ਦੀ ਸਮੀਖਿਆ ਦੀ ਬੇਨਤੀ ਕਰੋ",
 	"apiKeys.mcpRequestSend.description": "ਅਜਿਹੀ ਭੇਜਣ ਦਾ ਸੁਝਾਅ ਦਿਓ ਜਿਸਦੀ ਤੁਹਾਨੂੰ Mailflare ਵਿੱਚ ਪੁਸ਼ਟੀ ਕਰਨੀ ਪਵੇ।",
+	"apiKeys.mcpSend.label": "ਸਮੀਖਿਆ ਤੋਂ ਬਿਨਾਂ ਭੇਜੋ",
+	"apiKeys.mcpSend.description": "Mailflare ਵਿੱਚ ਪੁਸ਼ਟੀ ਤੋਂ ਬਿਨਾਂ ਤੁਰੰਤ ਈਮੇਲ ਭੇਜੋ।",
 	"apiKeys.mcpCalendarRead.label": "ਕੈਲੰਡਰ ਪੜ੍ਹੋ",
 	"apiKeys.mcpCalendarRead.description": "ਸਮਾਗਮਾਂ ਅਤੇ ਖਾਲੀ ਸਮੇਂ ਦੀ ਸੂਚੀ ਬਣਾਓ, ਖੋਜੋ ਅਤੇ ਜਾਂਚੋ।",
 	"apiKeys.mcpCalendarWrite.label": "ਕੈਲੰਡਰ ਸੰਭਾਲੋ",

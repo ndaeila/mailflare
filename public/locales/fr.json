@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "Marquer des messages comme lus et les déplacer.",
 	"apiKeys.mcpRequestSend.label": "Demander une validation d'envoi",
 	"apiKeys.mcpRequestSend.description": "Proposer un envoi que vous devez confirmer dans Mailflare.",
+	"apiKeys.mcpSend.label": "Envoyer sans vérification",
+	"apiKeys.mcpSend.description": "Envoyer les e-mails immédiatement, sans étape de confirmation dans Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "Lire l'agenda",
 	"apiKeys.mcpCalendarRead.description": "Lister, rechercher et consulter les événements et les créneaux libres.",
 	"apiKeys.mcpCalendarWrite.label": "Gérer l'agenda",

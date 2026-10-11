@@ -503,6 +503,8 @@
 	"apiKeys.mcpOrganize.description": "సందేశాలను చదివినట్లు గుర్తించండి మరియు తరలించండి.",
 	"apiKeys.mcpRequestSend.label": "పంపే సమీక్షను అభ్యర్థించండి",
 	"apiKeys.mcpRequestSend.description": "మీరు Mailflare లో నిర్ధారించాల్సిన పంపకాన్ని ప్రతిపాదించండి.",
+	"apiKeys.mcpSend.label": "సమీక్ష లేకుండా పంపు",
+	"apiKeys.mcpSend.description": "Mailflare లో నిర్ధారణ లేకుండా వెంటనే ఇమెయిల్ పంపండి.",
 	"apiKeys.mcpCalendarRead.label": "క్యాలెండర్ చదవండి",
 	"apiKeys.mcpCalendarRead.description": "ఈవెంట్‌లు మరియు ఖాళీ సమయాన్ని జాబితా చేయండి, శోధించండి మరియు పరిశీలించండి.",
 	"apiKeys.mcpCalendarWrite.label": "క్యాలెండర్‌ను నిర్వహించండి",

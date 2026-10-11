@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "Tandakan mesej sebagai dibaca dan alihkannya.",
 	"apiKeys.mcpRequestSend.label": "Minta semakan penghantaran",
 	"apiKeys.mcpRequestSend.description": "Cadangkan penghantaran yang mesti anda sahkan dalam Mailflare.",
+	"apiKeys.mcpSend.label": "Hantar tanpa semakan",
+	"apiKeys.mcpSend.description": "Hantar e-mel serta-merta, tanpa langkah pengesahan dalam Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "Baca kalendar",
 	"apiKeys.mcpCalendarRead.description": "Senaraikan, cari dan periksa acara serta masa lapang.",
 	"apiKeys.mcpCalendarWrite.label": "Urus kalendar",

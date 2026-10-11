@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "ทำเครื่องหมายข้อความว่าอ่านแล้วและย้ายข้อความ",
 	"apiKeys.mcpRequestSend.label": "ขอให้ตรวจทานก่อนส่ง",
 	"apiKeys.mcpRequestSend.description": "เสนอการส่งที่คุณต้องยืนยันใน Mailflare",
+	"apiKeys.mcpSend.label": "ส่งโดยไม่ต้องตรวจทาน",
+	"apiKeys.mcpSend.description": "ส่งอีเมลทันทีโดยไม่ต้องยืนยันใน Mailflare",
 	"apiKeys.mcpCalendarRead.label": "อ่านปฏิทิน",
 	"apiKeys.mcpCalendarRead.description": "แสดงรายการ ค้นหา และตรวจสอบกิจกรรมและเวลาว่าง",
 	"apiKeys.mcpCalendarWrite.label": "จัดการปฏิทิน",

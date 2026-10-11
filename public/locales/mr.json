@@ -503,6 +503,8 @@
 	"apiKeys.mcpOrganize.description": "संदेश वाचलेले म्हणून चिन्हांकित करा आणि हलवा.",
 	"apiKeys.mcpRequestSend.label": "पाठवण्याच्या पुनरावलोकनाची विनंती करा",
 	"apiKeys.mcpRequestSend.description": "तुम्हाला Mailflare मध्ये पुष्टी करावी लागेल असे पाठवणे सुचवा.",
+	"apiKeys.mcpSend.label": "पुनरावलोकनाशिवाय पाठवा",
+	"apiKeys.mcpSend.description": "Mailflare मध्ये पुष्टीकरणाशिवाय लगेच ईमेल पाठवा.",
 	"apiKeys.mcpCalendarRead.label": "कॅलेंडर वाचा",
 	"apiKeys.mcpCalendarRead.description": "इव्हेंट आणि मोकळ्या वेळेची यादी पहा, शोधा आणि तपासा.",
 	"apiKeys.mcpCalendarWrite.label": "कॅलेंडर व्यवस्थापित करा",

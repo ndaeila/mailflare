@@ -503,6 +503,8 @@
 	"apiKeys.mcpOrganize.description": "বার্তা পঠিত হিসেবে চিহ্নিত করুন এবং সরান।",
 	"apiKeys.mcpRequestSend.label": "পাঠানোর পর্যালোচনার অনুরোধ করুন",
 	"apiKeys.mcpRequestSend.description": "এমন একটি পাঠানোর প্রস্তাব দিন যা আপনাকে Mailflare-এ নিশ্চিত করতে হবে।",
+	"apiKeys.mcpSend.label": "পর্যালোচনা ছাড়া পাঠান",
+	"apiKeys.mcpSend.description": "Mailflare-এ নিশ্চিত করার ধাপ ছাড়াই সঙ্গে সঙ্গে ইমেল পাঠান।",
 	"apiKeys.mcpCalendarRead.label": "ক্যালেন্ডার পড়ুন",
 	"apiKeys.mcpCalendarRead.description": "ইভেন্ট ও ফাঁকা সময়ের তালিকা দেখুন, খুঁজুন এবং পরীক্ষা করুন।",
 	"apiKeys.mcpCalendarWrite.label": "ক্যালেন্ডার পরিচালনা করুন",
