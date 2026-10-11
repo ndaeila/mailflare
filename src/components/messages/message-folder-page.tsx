@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent } from "react";
-import { Archive, ChevronLeft, ChevronRight, ListFilter, Mail, MailOpen, Trash2, Undo2 } from "lucide-react";
+import { Archive, ChevronLeft, ChevronRight, ListFilter, ListOrdered, Mail, MailOpen, Trash2, Undo2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -164,7 +164,9 @@ function MessageListRow({
 					<span className="mt-0.5 block truncate text-xs leading-5 text-neutral-500">
 						{preview}
 					</span>
-					{message.scheduledCondition === "no_reply" && <span className="mt-1 block"><IfNoReplyChip label={t("schedule.ifNoReply")} /></span>}
+					{message.scheduledSequence
+						? <span className="mt-1 block"><SequenceChip name={message.scheduledSequence} /></span>
+						: message.scheduledCondition === "no_reply" && <span className="mt-1 block"><IfNoReplyChip label={t("schedule.ifNoReply")} /></span>}
 				</Link>
 			</div>
 		);
@@ -230,7 +232,9 @@ function MessageListRow({
 					aria-current={active ? "true" : undefined}
 					className="focus-visible:outline-none after:absolute after:inset-0"
 				>
-					{message.scheduledCondition === "no_reply" && <IfNoReplyChip label={t("schedule.ifNoReply")} />}
+					{message.scheduledSequence
+						? <SequenceChip name={message.scheduledSequence} />
+						: message.scheduledCondition === "no_reply" && <IfNoReplyChip label={t("schedule.ifNoReply")} />}
 					<span className={unread ? "font-semibold text-neutral-900" : ""}>
 						{rowMessage.subject ?? t("list.noSubject")}
 					</span>
@@ -611,6 +615,16 @@ export function MessageFolderPage({
 				)}
 			</div>
 		</div>
+	);
+}
+
+/** Gmail-style label on a scheduled email that is a step of a sequence. */
+function SequenceChip({ name }: { name: string }) {
+	return (
+		<span className="mr-2 inline-flex max-w-40 items-center gap-1 rounded bg-neutral-200 px-1.5 py-px align-middle text-xs text-neutral-700">
+			<ListOrdered className="h-3 w-3 shrink-0" aria-hidden />
+			<span className="truncate">{name}</span>
+		</span>
 	);
 }
 

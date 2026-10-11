@@ -29,6 +29,8 @@ export interface SendSequenceRequest {
 	stepOverrides?: Record<string, import("@/lib/sequences/types").SequenceStepInput>;
 	/** Send the sequence's template opening (rendered on the server) instead of this email's content. */
 	useTemplateOpening?: boolean;
+	/** The opening as typed, with {{fields}} intact, for saveOpening. */
+	openingTemplate?: { subject: string; body: string };
 	/** Also make this email the sequence's template opening. */
 	saveOpening?: boolean;
 	timeZone?: string;

@@ -50,7 +50,8 @@ export async function POST(request: Request) {
 			const data = parsed.data;
 			if (sequence.saveOpening && !sequence.useTemplateOpening) {
 				const current = await getSequence(env, user.id, sequence.sequenceId);
-				await updateSequence(env, user.id, sequence.sequenceId, { steps: [{ ...current.steps[0], subject: data.subject, body: data.text || htmlToReadableText(data.html || "") }, ...current.steps.slice(1)] });
+				const opening = sequence.openingTemplate ?? { subject: data.subject, body: data.text || htmlToReadableText(data.html || "") };
+				await updateSequence(env, user.id, sequence.sequenceId, { steps: [{ ...current.steps[0], subject: opening.subject, body: opening.body }, ...current.steps.slice(1)] });
 			}
 			const enrollment = await startEnrollment(env, user.id, {
 				sequenceId: sequence.sequenceId, mailboxId: data.mailboxId, from: data.from,

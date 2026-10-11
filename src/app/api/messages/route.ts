@@ -5,7 +5,7 @@ import type { SQL } from "drizzle-orm";
 import { getEnv } from "@/lib/cloudflare";
 import { getCurrentUser } from "@/lib/auth/cookies";
 import { getDb } from "@/db";
-import { messages, outboundJobs } from "@/db/schema";
+import { messages, outboundJobs, sequenceEnrollments, sequences } from "@/db/schema";
 import { getContactDisplayNameMap } from "@/lib/contacts/service";
 import { getFirstEmailAddressEntry, normalizeEmailAddress } from "@/lib/email/address";
 import { getMailboxAccessLevel, listAccessibleMailboxes } from "@/lib/mailboxes/access";
@@ -162,6 +162,7 @@ export async function GET(request: Request) {
 	}
 	const scheduledAtByMessageId = new Map<string, string>();
 	const scheduledConditionByMessageId = new Map<string, string>();
+	const scheduledSequenceByMessageId = new Map<string, string>();
 	if (scheduled === "true" && rows.length > 0) {
 		const jobs = await db
 			.select({ messageId: outboundJobs.messageId, scheduledAt: outboundJobs.scheduledAt, sendCondition: outboundJobs.sendCondition })
@@ -172,6 +173,12 @@ export async function GET(request: Request) {
 			const condition = parseSendCondition(job.sendCondition)?.type;
 			if (job.messageId && condition) scheduledConditionByMessageId.set(job.messageId, condition);
 		}
+		const sequenceRows = await db
+			.select({ messageId: sequenceEnrollments.nextMessageId, name: sequences.name })
+			.from(sequenceEnrollments)
+			.innerJoin(sequences, eq(sequences.id, sequenceEnrollments.sequenceId))
+			.where(inArray(sequenceEnrollments.nextMessageId, rows.map((row) => row.id)));
+		for (const row of sequenceRows) if (row.messageId) scheduledSequenceByMessageId.set(row.messageId, row.name);
 	}
 	const mailboxNameMap = new Map(
 		accessibleMailboxes.map((mailbox) => [
@@ -206,6 +213,7 @@ export async function GET(request: Request) {
 			snippet: message.snippet,
 			...(scheduledAtByMessageId.has(message.id) ? { scheduledAt: scheduledAtByMessageId.get(message.id) } : {}),
 			...(scheduledConditionByMessageId.has(message.id) ? { scheduledCondition: scheduledConditionByMessageId.get(message.id) } : {}),
+			...(scheduledSequenceByMessageId.has(message.id) ? { scheduledSequence: scheduledSequenceByMessageId.get(message.id) } : {}),
 			fromContactName:
 				(message.direction === "outbound" ? accountName : null) ??
 				contactMap?.get(normalizeEmailAddress(message.fromAddr)) ??

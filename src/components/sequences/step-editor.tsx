@@ -1,139 +1,186 @@
 "use client";
 
-import { ChevronLeft, Info, Mail, Reply } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, Plus, X } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import type { SequenceStep } from "@/lib/sequences/types";
-
-const fieldLabel = "mb-1.5 block text-xs font-medium text-neutral-500";
-const inputClass = "h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-[15px] text-neutral-900 outline-none focus:border-blue-500";
+import { BUILTIN_VARIABLES } from "@/lib/sequences/utils";
+import { fieldLabel } from "./sequence-ui-utils";
 
 function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; label: string }) {
 	return (
-		<div role="radiogroup" aria-label={label} className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-100 p-1">
-			{options.map((option) => (
-				<button
-					key={option.value}
-					type="button"
-					role="radio"
-					aria-checked={value === option.value}
-					onClick={() => onChange(option.value)}
-					className={cn("h-9 rounded-lg text-sm transition-colors", value === option.value ? "bg-white font-semibold text-neutral-900 shadow-sm dark:bg-neutral-300" : "text-neutral-500 hover:text-neutral-800")}
-				>
-					{option.label}
-				</button>
-			))}
+		<div role="radiogroup" aria-label={label} className="inline-flex overflow-hidden rounded-full border border-neutral-300">
+			{options.map((option, index) => {
+				const selected = value === option.value;
+				return (
+					<button
+						key={option.value}
+						type="button"
+						role="radio"
+						aria-checked={selected}
+						onClick={() => onChange(option.value)}
+						className={cn("flex h-9 items-center gap-1.5 px-4 text-sm font-medium transition-colors", index > 0 && "border-l border-neutral-300", selected ? "bg-blue-100 text-blue-900" : "text-neutral-700 hover:bg-neutral-100")}
+					>
+						{selected && <Check className="h-4 w-4" aria-hidden />}
+						{option.label}
+					</button>
+				);
+			})}
 		</div>
 	);
 }
 
-/** Send as / When / Only if / Subject / Message for one sequence step. */
-export function StepFields({ step, position, onChange, idPrefix }: { step: SequenceStep; position: number; onChange: (step: SequenceStep) => void; idPrefix: string }) {
+const lineInput = "w-full border-b border-neutral-200 bg-transparent py-2 text-[15px] text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-blue-600";
+const boxInput = "h-9 rounded-lg border border-neutral-300 bg-transparent px-2 text-sm text-neutral-900 outline-none focus:border-blue-600";
+
+/** The fields of one step: how and when it sends, then subject and message with merge-field chips. */
+export function StepForm({ step, position, onChange, fields = [], idPrefix }: { step: SequenceStep; position: number; onChange: (step: SequenceStep) => void; fields?: string[]; idPrefix: string }) {
 	const { t } = useLanguage();
+	const bodyRef = useRef<HTMLTextAreaElement>(null);
 	const set = (patch: Partial<SequenceStep>) => onChange({ ...step, ...patch });
-	if (position === 0) {
-		return (
-			<div className="space-y-4">
-				<div>
-					<label htmlFor={`${idPrefix}-subject`} className={fieldLabel}>{t("sequences.subject")}</label>
-					<input id={`${idPrefix}-subject`} value={step.subject} onChange={(event) => set({ subject: event.target.value })} className={inputClass} />
-				</div>
-				<div>
-					<label htmlFor={`${idPrefix}-body`} className={fieldLabel}>{t("sequences.message")}</label>
-					<textarea id={`${idPrefix}-body`} value={step.body} onChange={(event) => set({ body: event.target.value })} rows={7} className="w-full resize-y rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-[15px] leading-6 text-neutral-900 outline-none focus:border-blue-500" />
-				</div>
-			</div>
-		);
+	const insertable = [...BUILTIN_VARIABLES.filter((name) => name !== "last_name"), ...fields.filter((name) => !(BUILTIN_VARIABLES as readonly string[]).includes(name))];
+
+	function insertField(name: string) {
+		const area = bodyRef.current;
+		const token = `{{${name}}}`;
+		if (!area) { set({ body: `${step.body}${token}` }); return; }
+		const start = area.selectionStart ?? step.body.length;
+		const end = area.selectionEnd ?? start;
+		set({ body: `${step.body.slice(0, start)}${token}${step.body.slice(end)}` });
+		requestAnimationFrame(() => { area.focus(); area.setSelectionRange(start + token.length, start + token.length); });
 	}
+
 	return (
-		<div className="space-y-4">
-			<div>
-				<span className={fieldLabel}>{t("sequences.sendAs")}</span>
-				<Segmented label={t("sequences.sendAs")} value={step.kind === "new" ? "new" : "reply"} onChange={(kind) => set({ kind })} options={[{ value: "reply", label: t("sequences.replyInThread") }, { value: "new", label: t("sequences.newEmail") }]} />
-			</div>
-			<div>
-				<span className={fieldLabel}>{t("sequences.when")}</span>
-				<div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-2">
-					<label className={cn(inputClass, "flex items-center gap-2")}>
+		<div className="space-y-5">
+			{position > 0 && (
+				<>
+					<Segmented label={t("sequences.sendAs")} value={step.kind === "new" ? "new" : "reply"} onChange={(kind) => set({ kind, subject: kind === "new" ? step.subject : "" })} options={[{ value: "reply", label: t("sequences.replyInThread") }, { value: "new", label: t("sequences.newEmail") }]} />
+					<div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[15px] text-neutral-800">
 						<input
 							type="number"
 							min={0}
 							max={365}
 							inputMode="numeric"
-							aria-label={t("sequences.when")}
+							aria-label={t("sequences.delayDays")}
 							value={Number.isFinite(step.delayDays) ? step.delayDays : ""}
 							onChange={(event) => set({ delayDays: Math.max(0, Math.min(365, Number(event.target.value) || 0)) })}
-							className="w-9 shrink-0 bg-transparent text-[15px] outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+							className={cn(boxInput, "w-16 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none")}
 						/>
-						<span className="min-w-0 truncate text-[15px] text-neutral-900">{t("sequences.daysAfter", { step: position })}</span>
+						<span>{t("sequences.daysAfterPrevious")}</span>
+						<span className="text-neutral-500">{t("sequences.at")}</span>
+						<input type="time" step={60} aria-label={t("schedule.time")} value={step.sendTime ?? ""} onChange={(event) => set({ sendTime: event.target.value || null })} className={cn(boxInput, "w-32")} />
+					</div>
+					<label className="flex cursor-pointer items-center gap-3">
+						<span className="min-w-0 flex-1">
+							<span className="block text-[15px] text-neutral-900">{t("sequences.holdIfReplied")}</span>
+							<span className="block text-xs text-neutral-500">{step.condition === "no_reply" ? t("sequences.holdIfRepliedOn") : t("sequences.alwaysHint")}</span>
+						</span>
+						<Switch checked={step.condition === "no_reply"} onCheckedChange={(on) => set({ condition: on ? "no_reply" : "always" })} aria-label={t("sequences.holdIfReplied")} />
 					</label>
-					<input
-						type="time"
-						step={60}
-						aria-label={t("schedule.time")}
-						value={step.sendTime ?? ""}
-						onChange={(event) => set({ sendTime: event.target.value || null })}
-						className={inputClass}
-						title={step.sendTime ? undefined : t("sequences.anyTime")}
-					/>
-				</div>
-			</div>
-			<div>
-				<span className={fieldLabel}>{t("sequences.onlyIf")}</span>
-				<Segmented label={t("sequences.onlyIf")} value={step.condition} onChange={(condition) => set({ condition })} options={[{ value: "no_reply", label: t("sequences.noReplyYet") }, { value: "always", label: t("sequences.alwaysOption") }]} />
-			</div>
-			{step.kind === "new" && (
-				<div>
-					<label htmlFor={`${idPrefix}-subject`} className={fieldLabel}>{t("sequences.subject")}</label>
-					<input id={`${idPrefix}-subject`} value={step.subject} onChange={(event) => set({ subject: event.target.value })} className={inputClass} />
-				</div>
+				</>
 			)}
-			<div>
-				<label htmlFor={`${idPrefix}-body`} className={fieldLabel}>{t("sequences.message")}</label>
-				<textarea id={`${idPrefix}-body`} value={step.body} onChange={(event) => set({ body: event.target.value })} rows={7} className="w-full resize-y rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-[15px] leading-6 text-neutral-900 outline-none focus:border-blue-500" />
+			<div className="space-y-1">
+				{step.kind === "reply" ? (
+					<p className="border-b border-neutral-200 py-2 text-[15px] text-neutral-500">{t("sequences.replySubject")}</p>
+				) : (
+					<input id={`${idPrefix}-subject`} aria-label={t("sequences.subject")} placeholder={t("sequences.subject")} value={step.subject} onChange={(event) => set({ subject: event.target.value })} className={lineInput} />
+				)}
+				<textarea
+					ref={bodyRef}
+					id={`${idPrefix}-body`}
+					aria-label={t("sequences.message")}
+					placeholder={t("sequences.message")}
+					value={step.body}
+					onChange={(event) => set({ body: event.target.value })}
+					rows={8}
+					className="block min-h-40 w-full resize-y bg-transparent py-2 text-[15px] leading-6 text-neutral-900 outline-none placeholder:text-neutral-400"
+				/>
 			</div>
-			<p className="flex items-start gap-2 rounded-xl border border-dashed border-neutral-300 px-3 py-2.5 text-xs leading-5 text-neutral-600">
-				{step.kind === "new" ? <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden /> : <Reply className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />}
-				<span>{step.kind === "new" ? t("sequences.newHint") : t("sequences.replyHint")}{step.condition === "always" && <> {t("sequences.alwaysHint")}</>}</span>
-			</p>
+			<div className="flex flex-wrap items-center gap-1.5">
+				<span className="mr-1 text-xs text-neutral-500">{t("sequences.insertField")}</span>
+				{insertable.map((name) => (
+					<button key={name} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => insertField(name)} className="flex h-7 items-center gap-1 rounded-lg border border-neutral-300 px-2 text-xs font-medium text-neutral-700 hover:bg-neutral-100">
+						<Plus className="h-3 w-3" aria-hidden />{fieldLabel(name, t)}
+					</button>
+				))}
+				<NewFieldButton onAdd={insertField} />
+			</div>
 		</div>
 	);
 }
 
-export function PlaceholderHint() {
+function NewFieldButton({ onAdd }: { onAdd: (name: string) => void }) {
 	const { t } = useLanguage();
+	const [editing, setEditing] = useState(false);
+	const [value, setValue] = useState("");
+	const name = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(\d)/, "f_$1");
+	if (!editing) return <button type="button" onClick={() => setEditing(true)} className="h-7 rounded-lg px-2 text-xs font-medium text-blue-700 hover:bg-blue-50">{t("sequences.customField")}</button>;
 	return (
-		<p className="flex items-start gap-2 text-xs leading-5 text-neutral-500">
-			<Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-			{t("sequences.placeholderHint", { examples: "{{first_name}}, {{last_name}}, {{name}}, {{email}}" })}
-		</p>
+		<span className="flex items-center gap-1">
+			<input
+				autoFocus
+				value={value}
+				onChange={(event) => setValue(event.target.value)}
+				onKeyDown={(event) => {
+					if (event.key === "Enter") { event.preventDefault(); if (name) onAdd(name); setValue(""); setEditing(false); }
+					if (event.key === "Escape") { setValue(""); setEditing(false); }
+				}}
+				placeholder={t("sequences.customFieldPlaceholder")}
+				className="h-7 w-32 rounded-lg border border-neutral-300 bg-transparent px-2 text-xs text-neutral-900 outline-none focus:border-blue-600"
+			/>
+			<button type="button" disabled={!name} onClick={() => { onAdd(name); setValue(""); setEditing(false); }} className="h-7 rounded-lg px-2 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-40">{t("sequences.add")}</button>
+		</span>
 	);
 }
 
-/** Full-height panel: "← Research outreach · Step 3   Done". */
-export function StepEditorPanel({ title, step, position, onChange, onDone, onBack, busy, error }: {
+/** Material-style dialog for one step; full screen on phones like Gmail's mobile compose. */
+export function StepDialog({ open, onOpenChange, title, subtitle, step, position, fields, onSave, busy, error }: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
 	title: string;
-	step: SequenceStep;
+	subtitle?: string;
+	step: SequenceStep | null;
 	position: number;
-	onChange: (step: SequenceStep) => void;
-	onDone: () => void;
-	onBack: () => void;
+	fields?: string[];
+	onSave: (step: SequenceStep) => void;
 	busy?: boolean;
 	error?: string | null;
 }) {
 	const { t } = useLanguage();
+	const [draft, setDraft] = useState<SequenceStep | null>(step);
+	// Start from the step each time the dialog opens; edits stay local until Save.
+	const [seenOpen, setSeenOpen] = useState(open);
+	if (seenOpen !== open) {
+		setSeenOpen(open);
+		if (open) setDraft(step);
+	}
 	return (
-		<div className="flex h-full min-h-0 flex-col bg-white">
-			<div className="flex h-12 shrink-0 items-center gap-2 border-b border-neutral-100 px-3">
-				<button type="button" onClick={onBack} aria-label={t("sequences.back")} className="rounded-full p-1.5 text-neutral-600 hover:bg-neutral-100"><ChevronLeft className="h-5 w-5" /></button>
-				<span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-neutral-900">{title}</span>
-				<button type="button" onClick={onDone} disabled={busy} className="rounded-full px-3 py-1.5 text-[15px] font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-50">{t("sequences.done")}</button>
-			</div>
-			<div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-				{error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-				<StepFields step={step} position={position} onChange={onChange} idPrefix={`step-${position}`} />
-				<PlaceholderHint />
-			</div>
-		</div>
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent
+				closeClassName="hidden"
+				onOpenAutoFocus={(event) => event.preventDefault()}
+				className="flex max-h-none flex-col p-0 max-sm:inset-0 max-sm:h-dvh max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none sm:max-h-[calc(100dvh-4rem)] sm:w-[min(560px,calc(100vw-32px))] sm:rounded-[28px]"
+			>
+				<div className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-3 sm:px-6 sm:pt-6">
+					<button type="button" onClick={() => onOpenChange(false)} aria-label={t("common.cancel")} className="rounded-full p-2 text-neutral-700 hover:bg-neutral-100 sm:hidden"><X className="h-5 w-5" /></button>
+					<div className="min-w-0 flex-1">
+						<DialogTitle className="truncate text-[20px] font-normal text-neutral-900 sm:text-2xl">{title}</DialogTitle>
+						{subtitle && <p className="truncate text-sm text-neutral-500">{subtitle}</p>}
+					</div>
+					<button type="button" disabled={busy || !draft} onClick={() => draft && onSave(draft)} className="rounded-full bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:hidden">{t("sequences.save")}</button>
+				</div>
+				<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-2 sm:px-6">
+					{error && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+					{draft && <StepForm step={draft} position={position} onChange={setDraft} fields={fields} idPrefix={`step-${position}`} />}
+				</div>
+				<div className="hidden shrink-0 justify-end gap-2 px-6 pb-6 pt-2 sm:flex">
+					<button type="button" onClick={() => onOpenChange(false)} className="rounded-full px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">{t("common.cancel")}</button>
+					<button type="button" disabled={busy || !draft} onClick={() => draft && onSave(draft)} className="rounded-full bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{t("sequences.save")}</button>
+				</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { ListOrdered } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { formatScheduledSendTime } from "@/components/messages/scheduled-send-utils";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { authFetch } from "@/lib/auth/client";
 import { getEmailAddress, getEmailDisplayName, getFirstEmailAddressEntry } from "@/lib/email/address";
 import type { EnrollmentView, SequenceStep } from "@/lib/sequences/types";
-import { StepEditorPanel } from "./step-editor";
+import { StepDialog } from "./step-editor";
 
 function firstName(to: string): string {
 	const entry = getFirstEmailAddressEntry(to);
@@ -16,19 +16,20 @@ function firstName(to: string): string {
 	return name && !name.includes("@") ? name.split(/\s+/)[0] : getEmailAddress(entry);
 }
 
-/** Above a message that belongs to a sequence: what goes out next, with Edit / Skip / Stop. */
+const actionClass = "shrink-0 rounded-full px-2.5 py-1 font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50";
+
+/** Above a message in a sequence, styled like Gmail's scheduled-send bar: what goes out next, with Edit / Skip / Stop. */
 export function SequenceThreadBanner({ messageId }: { messageId: string }) {
 	const { t } = useLanguage();
 	const [enrollment, setEnrollment] = useState<EnrollmentView | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [editing, setEditing] = useState<{ position: number; step: SequenceStep } | null>(null);
+	const [editing, setEditing] = useState(false);
 
 	const load = useCallback(async () => {
 		const response = await authFetch(`/api/sequences/enrollments?messageId=${encodeURIComponent(messageId)}`);
 		if (!response.ok) return;
-		const data = await response.json() as { enrollment: EnrollmentView | null };
-		setEnrollment(data.enrollment);
+		setEnrollment((await response.json() as { enrollment: EnrollmentView | null }).enrollment);
 	}, [messageId]);
 
 	useEffect(() => {
@@ -48,7 +49,7 @@ export function SequenceThreadBanner({ messageId }: { messageId: string }) {
 			const data = await response.json() as { enrollment?: EnrollmentView; error?: string };
 			if (!response.ok || !data.enrollment) throw new Error(data.error || t("sequences.actionFailed"));
 			setEnrollment(data.enrollment);
-			setEditing(null);
+			setEditing(false);
 			window.dispatchEvent(new Event("mailflare:messages-changed"));
 		} catch (cause) {
 			setError(cause instanceof Error ? cause.message : t("sequences.actionFailed"));
@@ -59,55 +60,55 @@ export function SequenceThreadBanner({ messageId }: { messageId: string }) {
 	}
 
 	if (!enrollment) return null;
-	const total = enrollment.steps.length;
+	const post = (body: object) => () => authFetch(`/api/sequences/enrollments/${enrollment.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 	const who = firstName(enrollment.to);
 	const next = enrollment.nextStep !== null ? enrollment.steps[enrollment.nextStep] : null;
+	const name = <Link href={`/sequences/${enrollment.sequenceId}`} className="font-medium text-neutral-900 hover:underline">{enrollment.sequenceName}</Link>;
 	let line: React.ReactNode;
-	if (next && next.state === "scheduled" && enrollment.nextSendAt) {
-		line = <>{t("sequences.bannerNext", { name: enrollment.sequenceName, step: next.position + 1, total, when: formatScheduledSendTime(enrollment.nextSendAt, t) })}{next.condition === "no_reply" && <> {t("sequences.unlessReplies", { who })}</>}</>;
-	} else if (next && next.state === "paused") {
-		line = t("sequences.bannerPaused", { name: enrollment.sequenceName, step: next.position + 1 });
+	if (next?.state === "scheduled" && enrollment.nextSendAt) {
+		const when = formatScheduledSendTime(enrollment.nextSendAt, t);
+		line = <>{name} · {next.position === 0 ? t("sequences.openingSends", { when }) : t("sequences.followUpSends", { number: next.position, when })}{next.position > 0 && next.condition === "no_reply" && <> {t("sequences.unlessReplies", { who })}</>}</>;
+	} else if (next?.state === "paused") {
+		line = <>{name} · {t("sequences.followUpInDrafts", { number: next.position })}</>;
 	} else if (enrollment.status === "replied") {
-		line = t("sequences.bannerReplied", { name: enrollment.sequenceName, who: enrollment.repliedFrom ? firstName(enrollment.repliedFrom) : who });
+		line = <>{name} · {t("sequences.stoppedReplied", { who: enrollment.repliedFrom ? firstName(enrollment.repliedFrom) : who })}</>;
 	} else if (enrollment.status === "finished") {
-		line = t("sequences.bannerFinished", { name: enrollment.sequenceName });
+		line = <>{name} · {t("sequences.allSent")}</>;
 	} else if (enrollment.status === "stopped" || enrollment.status === "failed") {
-		line = t("sequences.bannerStopped", { name: enrollment.sequenceName });
+		line = <>{name} · {t("sequences.stopped")}</>;
 	} else {
 		return null;
 	}
-	const canAct = !!next && next.state === "scheduled";
+	const editable = next?.state === "scheduled" && next.position > 0 ? next : null;
+	const editableStep: SequenceStep | null = editable ? { kind: editable.kind, delayDays: editable.delayDays, sendTime: editable.sendTime, condition: editable.condition, subject: editable.subject, body: editable.body } : null;
 	return (
-		<div className="mb-2 rounded-xl bg-neutral-100 px-4 py-3 text-sm text-neutral-700 sm:mx-6">
-			<div className="flex items-start gap-3">
-				<ListOrdered className="mt-0.5 h-5 w-5 shrink-0 text-neutral-500" aria-hidden />
-				<span className="min-w-0 flex-1 leading-5">{line}</span>
+		<div className="mb-2 rounded-lg bg-neutral-100 px-4 py-2.5 text-sm text-neutral-600 sm:mx-6">
+			<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+				<ListOrdered className="h-5 w-5 shrink-0 text-neutral-500" aria-hidden />
+				<span className="min-w-0 flex-1 basis-[calc(100%-2rem)] leading-5 sm:basis-auto">{line}</span>
+				{next?.state === "scheduled" && (
+					<span className="-ml-2.5 flex items-center pl-8 sm:-mr-2 sm:ml-0 sm:pl-0">
+						{editable && <button type="button" disabled={busy} onClick={() => setEditing(true)} className={actionClass}>{t("sequences.edit")}</button>}
+						{editable && <button type="button" disabled={busy} onClick={() => void act(post({ action: "skip" }))} className={actionClass}>{t("sequences.skip")}</button>}
+						<button type="button" disabled={busy} onClick={() => void act(post({ action: "stop" }))} className={actionClass}>{t("sequences.stop")}</button>
+					</span>
+				)}
 			</div>
-			{error && <p role="alert" className="mt-2 pl-8 text-red-600">{error}</p>}
-			{canAct && next && (
-				<div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 pl-8">
-					{next.position > 0 && <button type="button" disabled={busy} onClick={() => setEditing({ position: next.position, step: { kind: next.kind, delayDays: next.delayDays, sendTime: next.sendTime, condition: next.condition, subject: next.subject, body: next.body } })} className="font-medium text-blue-600 hover:underline disabled:opacity-50">{t("sequences.editNext")}</button>}
-					{next.position > 0 && <button type="button" disabled={busy} onClick={() => void act(() => authFetch(`/api/sequences/enrollments/${enrollment.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "skip" }) }))} className="font-medium text-blue-600 hover:underline disabled:opacity-50">{t("sequences.skipStep")}</button>}
-					<button type="button" disabled={busy} onClick={() => void act(() => authFetch(`/api/sequences/enrollments/${enrollment.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "stop" }) }))} className="font-medium text-red-600 hover:underline disabled:opacity-50">{t("sequences.stop")}</button>
-				</div>
+			{error && !editing && <p role="alert" className="mt-1 pl-8 text-red-600">{error}</p>}
+			{editable && (
+				<StepDialog
+					open={editing}
+					onOpenChange={setEditing}
+					title={t("sequences.followUpTitle", { number: editable.position })}
+					subtitle={`${enrollment.sequenceName} · ${who} · ${t("sequences.thisPersonOnly")}`}
+					step={editableStep}
+					position={editable.position}
+					fields={Object.keys(enrollment.variables)}
+					busy={busy}
+					error={error}
+					onSave={(step) => void act(() => authFetch(`/api/sequences/enrollments/${enrollment.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ position: editable.position, ...step }) }))}
+				/>
 			)}
-			<Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null); }}>
-				<DialogContent className="h-[min(720px,90dvh)] w-[min(480px,calc(100vw-16px))] overflow-hidden p-0" closeClassName="hidden" onOpenAutoFocus={(event) => event.preventDefault()}>
-					<DialogTitle className="sr-only">{t("sequences.editNext")}</DialogTitle>
-					{editing && (
-						<StepEditorPanel
-							title={t("sequences.stepTitle", { name: enrollment.sequenceName, step: editing.position + 1 })}
-							step={editing.step}
-							position={editing.position}
-							busy={busy}
-							error={error}
-							onChange={(step) => setEditing({ position: editing.position, step })}
-							onBack={() => setEditing(null)}
-							onDone={() => void act(() => authFetch(`/api/sequences/enrollments/${enrollment.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ position: editing.position, ...editing.step }) }))}
-						/>
-					)}
-				</DialogContent>
-			</Dialog>
 		</div>
 	);
 }
