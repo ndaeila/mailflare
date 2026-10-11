@@ -60,8 +60,8 @@ export function RichTextEditor({
 	const [showQuoted, setShowQuoted] = useState(false);
 	const savedRange = useRef<Range | null>(null);
 	const rootRef = useRef<HTMLDivElement | null>(null);
-	// Phones show the formatting bar only while writing. It sits at the top of the editor, under
-	// Subject: above the keyboard it would be covered by Safari's floating address and form bars.
+	// Phones show the formatting bar only while writing, as the last row of the sheet: the sheet's
+	// content ends where the visible area does, so it sits right above the keyboard and Safari's bars.
 	const [focused, setFocused] = useState(false);
 	const lastRange = useRef<Range | null>(null);
 	const labelRef = useRef(mergeFieldLabel);
@@ -220,7 +220,7 @@ export function RichTextEditor({
 				onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) event.preventDefault(); }}
 				className={cn(
 					"relative flex items-center gap-0.5 border-t border-neutral-100 px-4 py-3",
-					focused && !disabled ? "max-md:sticky max-md:top-0 max-md:z-10 max-md:order-first max-md:flex max-md:gap-0.5 max-md:overflow-x-auto max-md:border-b max-md:border-t-0 max-md:bg-white max-md:px-1 max-md:py-1 max-md:[scrollbar-width:none]" : "max-md:hidden",
+					focused && !disabled ? "max-md:flex max-md:gap-0.5 max-md:overflow-x-auto max-md:border-t max-md:border-neutral-200 max-md:bg-white max-md:px-1 max-md:py-1 max-md:[scrollbar-width:none]" : "max-md:hidden",
 				)}
 			>
 				<span className="contents max-md:hidden">{toolbarStart}</span>
