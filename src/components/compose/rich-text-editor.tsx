@@ -20,6 +20,7 @@ import { EmailHtmlRenderer } from "@/components/messages/email-html-renderer";
 import { sanitizeEmailHtml, sanitizeEditorHtml } from "@/lib/email/html";
 import type { RichTextEditorProps, ToolbarCommand } from "./rich-text-editor-types";
 import { fieldsFromEditorHtml, fieldsToEditorHtml, mergeFieldChipHtml } from "./merge-field-utils";
+import { focusEditableEnd } from "./phone-keyboard-utils";
 
 const COMMANDS: ToolbarCommand[] = [
 	{ command: "bold", labelKey: "editor.bold", icon: Bold },
@@ -172,7 +173,8 @@ export function RichTextEditor({
 			ref={rootRef}
 			className={cn("flex min-h-0 flex-1 flex-col", className)}
 		>
-			<div className="relative min-h-0 flex-1 overflow-y-auto">
+			{/* A tap anywhere in the empty space below the text starts writing, as in Gmail. */}
+			<div className="relative min-h-0 flex-1 overflow-y-auto" onClick={(event) => { if (event.target === event.currentTarget && !disabled) focusEditableEnd(editorRef.current); }}>
 				<div
 					ref={editorRef}
 					id={id}
@@ -188,7 +190,7 @@ export function RichTextEditor({
 					onKeyDown={onKeyDown}
 					className={cn(
 						"email-body max-w-none px-4 py-3 text-sm text-neutral-900 outline-none max-md:text-base",
-						"min-h-32 empty:before:pointer-events-none empty:before:text-neutral-400 empty:before:content-[attr(data-placeholder)]",
+						"min-h-32 max-md:min-h-full empty:before:pointer-events-none empty:before:text-neutral-400 empty:before:content-[attr(data-placeholder)]",
 						disabled && "cursor-not-allowed opacity-60",
 					)}
 				/>
@@ -212,7 +214,8 @@ export function RichTextEditor({
 			</div>
 			{footerContent}
 			<div
-				onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) event.preventDefault(); }}
+				// mousedown, not pointerdown: cancelling pointerdown on iOS still lets the tap take focus from the editor.
+				onMouseDown={(event) => { if ((event.target as HTMLElement).closest("button")) event.preventDefault(); }}
 				className={cn(
 					"relative flex items-center gap-0.5 border-t border-neutral-100 px-4 py-3",
 					phoneToolbarOpen && !disabled ? "max-md:order-first max-md:flex max-md:gap-0.5 max-md:overflow-x-auto max-md:border-b max-md:border-t-0 max-md:px-1 max-md:py-1 max-md:[scrollbar-width:none]" : "max-md:hidden",

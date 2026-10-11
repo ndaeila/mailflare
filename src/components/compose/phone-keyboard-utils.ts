@@ -44,3 +44,16 @@ export function handOffPhoneKeyboard(target: HTMLElement | null) {
 export function phoneKeyboardPrimed() {
 	return typeof document !== "undefined" && document.activeElement?.id === PROXY_ID;
 }
+
+/** Focuses a contentEditable with the caret at the end of its text, as tapping below the text would. */
+export function focusEditableEnd(element: HTMLElement | null | undefined) {
+	if (!element) return;
+	element.focus({ preventScroll: true });
+	const selection = window.getSelection();
+	if (!selection) return;
+	const range = document.createRange();
+	range.selectNodeContents(element);
+	range.collapse(false);
+	selection.removeAllRanges();
+	selection.addRange(range);
+}

@@ -80,10 +80,13 @@ export function usePhoneSheetPosition(
 				return;
 			}
 			const top = viewport.offsetTop;
+			// The page behind (the shrunken card) moves with Safari's pan too; shift it back the same amount.
+			document.documentElement.style.setProperty("--mf-vv-top", `${top}px`);
 			element.style.setProperty("top", `${top + PHONE_SHEET_GAP}px`);
 			element.style.setProperty("height", `${viewport.height - PHONE_SHEET_GAP}px`);
 			if (debug) {
 				const rect = element.getBoundingClientRect();
+				debug.style.setProperty("top", `${top}px`);
 				debug.textContent = `vv top ${Math.round(top)} h ${Math.round(viewport.height)} · scrollY ${Math.round(window.scrollY)} · inner ${window.innerHeight} · sheet ${Math.round(rect.top)}–${Math.round(rect.bottom)} · ${document.activeElement?.id || document.activeElement?.tagName}`;
 			}
 			if (cover?.current) {
@@ -112,6 +115,7 @@ export function usePhoneSheetPosition(
 		return () => {
 			cancelAnimationFrame(frame);
 			debug?.remove();
+			document.documentElement.style.removeProperty("--mf-vv-top");
 			viewport.removeEventListener("resize", follow);
 			viewport.removeEventListener("scroll", follow);
 			document.removeEventListener("focusin", follow);

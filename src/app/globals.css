@@ -524,6 +524,8 @@ button {
 	}
 	body.mf-sheet-open .mf-app-root {
 		transform: translateY(8px) scale(0.93);
+		/* Follows Safari's keyboard pan instantly (not animated with transform), so the card stays put. */
+		translate: 0 var(--mf-vv-top, 0px);
 		border-radius: 14px;
 		overflow: hidden;
 		filter: brightness(0.8);
