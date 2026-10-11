@@ -97,7 +97,7 @@ export function createMailflareMcpHandler(env: CloudflareEnv, principal: McpPrin
 			try { return output(await sendAgentDraftDirect(env, principal.user, draftId, expectedRevision, principal.keyId, origin)); }
 			catch (error) { return output({ error: error instanceof Error ? error.message : "Send failed" }, true); }
 		};
-		server.registerTool("send_draft", { description: "Send an assistant draft immediately, without review in Mailflare. Get draftId and revision from draft_email, draft_reply or update_draft.", inputSchema: z.object({ mailboxId: z.string(), draftId: z.string(), expectedRevision: z.number().int().positive() }) }, async ({ mailboxId, draftId, expectedRevision }) => {
+		server.registerTool("send_draft", { description: "Send an assistant draft without review in Mailflare. Get draftId and revision from draft_email, draft_reply or update_draft. If update_draft set scheduledAt, the email is scheduled for that time instead of sent now; with cancelIfReply it is held back if anyone in the thread or a recipient replies first.", inputSchema: z.object({ mailboxId: z.string(), draftId: z.string(), expectedRevision: z.number().int().positive() }) }, async ({ mailboxId, draftId, expectedRevision }) => {
 			if (!principal.mailboxIds.includes(mailboxId)) return output({ error: "Permission denied" }, true);
 			return sendDraft(mailboxId, draftId, expectedRevision);
 		});
