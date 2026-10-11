@@ -40,7 +40,8 @@ import type { ComposeAttachmentPolicy } from "./attachment-policy-types";
 import { CompareOpeningsDialog } from "@/components/sequences/compare-openings-dialog";
 import { SequenceStrip } from "@/components/sequences/sequence-strip";
 import { SequencesSheet, SequencesSubmenu } from "@/components/sequences/sequences-submenu";
-import { InsertFieldMenu, SequenceEmailEditor } from "@/components/sequences/sequence-email-editor";
+import { InsertFieldMenu, SequenceEmailWindow } from "@/components/sequences/sequence-email-editor";
+import { SequenceEditorWindow } from "@/components/sequences/sequence-editor";
 import { MergeFieldInput } from "@/components/sequences/merge-field-input";
 import { TemplatesSheet } from "./templates-sheet";
 import { usePhoneScrollLock, usePhoneSheetPosition } from "./use-keyboard-inset";
@@ -110,6 +111,8 @@ export function ComposeForm({
 	// The draft set aside when the template opening was chosen instead, so it can come back.
 	const [stashedDraft, setStashedDraft] = useState<{ subject: string; html: string } | null>(null);
 	const [editingStep, setEditingStep] = useState<number | null>(null);
+	// The sequence editor as a sheet over the composer: an existing sequence's id, or null for a new one.
+	const [sequenceEditor, setSequenceEditor] = useState<{ id: string | null } | null>(null);
 	const [compareOpen, setCompareOpen] = useState(false);
 	const [sequenceSheetOpen, setSequenceSheetOpen] = useState(false);
 	const [templatesSheetOpen, setTemplatesSheetOpen] = useState(false);
@@ -757,7 +760,7 @@ export function ComposeForm({
 					{t("template.templates")}
 				</DropdownMenu.Item>
 			)}
-			{agentRevision === null && <SequencesSubmenu onPick={chooseSequence} onOpenSheet={() => setSequenceSheetOpen(true)} disabled={!fromAddr} />}
+			{agentRevision === null && <SequencesSubmenu onPick={chooseSequence} onOpenSheet={() => setSequenceSheetOpen(true)} onEdit={(picked) => setSequenceEditor({ id: picked.id })} onCreate={() => setSequenceEditor({ id: null })} disabled={!fromAddr} />}
 			<DropdownMenu.Item onSelect={() => void deleteDraftAndClose()} disabled={deletingDraft} className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-red-600 outline-none hover:bg-red-50 focus:bg-red-50 data-[disabled]:opacity-50">
 				<Trash2 className="h-5 w-5" />
 				{t("compose.discard")}
@@ -780,22 +783,34 @@ export function ComposeForm({
 					{toast.message}
 				</div>
 			)}
+			{sequence && editingStep !== null && sequenceSteps[editingStep] && (
+				<SequenceEmailWindow
+					open
+					onOpenChange={(open) => { if (!open) setEditingStep(null); }}
+					key={editingStep}
+					title={t("sequences.followUpTitle", { number: editingStep })}
+					subtitle={`${sequence.name} · ${t("sequences.day", { day: stepDays(sequenceSteps)[editingStep] })}`}
+					step={sequenceSteps[editingStep]}
+					position={editingStep}
+					fields={sequence.variables}
+					threadSubject={subject}
+					onDone={(step) => { setSequenceOverrides((current) => ({ ...current, [editingStep]: step })); setEditingStep(null); }}
+				/>
+			)}
+			<SequenceEditorWindow
+				open={!!sequenceEditor}
+				onOpenChange={(open) => { if (!open) setSequenceEditor(null); }}
+				sequenceId={sequenceEditor?.id ?? null}
+				onSaved={(saved) => {
+					const created = !sequenceEditor?.id;
+					setSequenceEditor(null);
+					// A sequence made from here is attached to this email; editing the attached one refreshes it.
+					if (created) chooseSequence(saved);
+					else if (sequence?.id === saved.id) { setSequence(saved); setSequenceOverrides({}); }
+				}}
+				onDeleted={(id) => { if (sequence?.id === id) removeSequence(); }}
+			/>
 			<form onSubmit={onSubmit} className={cn(frameClass, mobileFrameClass, phoneSheet && "mf-sheet", closing && "mf-sheet-closing")} style={dragY ? { transform: `translateY(${dragY}px)`, transition: "none" } : undefined} ref={formRef} role={modalMode && !minimized ? "dialog" : mode === "popup" ? "region" : undefined} aria-modal={modalMode && !minimized || undefined} aria-label={mode === "popup" ? t("compose.dialogLabel") : undefined} onKeyDown={(event) => { if (modalMode && !minimized && event.key === "Escape") { event.preventDefault(); setModalMode(false); } }} onDragEnterCapture={minimized ? undefined : onFileDragEnter} onDragOverCapture={minimized ? undefined : onFileDragOver} onDragLeaveCapture={minimized ? undefined : onFileDragLeave} onDropCapture={minimized ? undefined : onFileDrop}>
-				{sequence && editingStep !== null && sequenceSteps[editingStep] && (
-					<div ref={(element) => element?.scrollIntoView({ block: "nearest" })} className="absolute inset-0 z-30" onKeyDown={(event) => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
-						<SequenceEmailEditor
-							key={editingStep}
-							title={t("sequences.followUpTitle", { number: editingStep })}
-							subtitle={`${sequence.name} · ${t("sequences.day", { day: stepDays(sequenceSteps)[editingStep] })}`}
-							step={sequenceSteps[editingStep]}
-							position={editingStep}
-							fields={sequence.variables}
-							threadSubject={subject}
-							onCancel={() => setEditingStep(null)}
-							onDone={(step) => { setSequenceOverrides((current) => ({ ...current, [editingStep]: step })); setEditingStep(null); }}
-						/>
-					</div>
-				)}
 				{draggingFiles && !minimized && (
 					<div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-blue-400 bg-blue-50/90 text-sm font-medium text-blue-700" aria-hidden="true">
 						{t("compose.dropFiles")}
@@ -879,7 +894,7 @@ export function ComposeForm({
 					)}
 					</div>
 					<ScheduleSendDialog open={headerScheduleOpen} onOpenChange={setHeaderScheduleOpen} onSchedule={(value, options) => void submit(value, options)} initialCancelIfReply={cancelIfReply} />
-					<SequencesSheet open={sequenceSheetOpen} onOpenChange={setSequenceSheetOpen} onPick={chooseSequence} />
+					<SequencesSheet open={sequenceSheetOpen} onOpenChange={setSequenceSheetOpen} onPick={chooseSequence} onEdit={(picked) => setSequenceEditor({ id: picked.id })} onCreate={() => setSequenceEditor({ id: null })} />
 					<TemplatesSheet
 						open={templatesSheetOpen}
 						onOpenChange={setTemplatesSheetOpen}

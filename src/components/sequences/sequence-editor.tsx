@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Mail, Plus, Reply, Trash2 } from "lucide-react";
+import { ArrowLeft, Mail, Plus, Reply, Trash2, X } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { formatScheduledSendTime } from "@/components/messages/scheduled-send-utils";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -11,6 +11,7 @@ import { authFetch } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 import type { EnrollmentView, SequenceStep, SequenceSummary } from "@/lib/sequences/types";
 import { sequenceVariables, stepDays } from "@/lib/sequences/utils";
+import { EditorWindow } from "@/components/compose/editor-window";
 import { SequenceEmailWindow } from "./sequence-email-editor";
 import { TemplateText } from "./template-text";
 import { previewText, sequenceStats } from "./sequence-ui-utils";
@@ -32,8 +33,13 @@ function personLink(person: EnrollmentView): string {
 	return sent?.messageId ? `/sent/${sent.messageId}` : "/sent";
 }
 
-/** Create or edit a sequence, Gmail-settings style: rows that open a dialog, then who is in it. */
-export function SequenceEditor({ sequenceId }: { sequenceId: string | null }) {
+/** Create or edit a sequence, Gmail-settings style: rows that open a dialog, then who is in it.
+ * `embedded` shows it as a sheet over the composer: it closes instead of navigating, hands a
+ * saved sequence back, and leaves out the people list, whose links would leave the page. */
+export function SequenceEditor({ sequenceId, embedded }: {
+	sequenceId: string | null;
+	embedded?: { onClose: () => void; onSaved: (sequence: SequenceSummary) => void; onDeleted?: (id: string) => void };
+}) {
 	const { t } = useLanguage();
 	const router = useRouter();
 	const [name, setName] = useState("");
@@ -83,6 +89,7 @@ export function SequenceEditor({ sequenceId }: { sequenceId: string | null }) {
 			setSummary(data.sequence);
 			setDirty(false);
 			setNotice({ type: "success", text: t("sequences.saved") });
+			if (embedded) { embedded.onSaved(data.sequence); return; }
 			if (!sequenceId) router.replace(`/sequences/${data.sequence.id}`);
 		} catch (error) {
 			setNotice({ type: "error", text: error instanceof Error ? error.message : t("sequences.saveFailed") });
@@ -92,11 +99,12 @@ export function SequenceEditor({ sequenceId }: { sequenceId: string | null }) {
 	}
 
 	async function remove() {
-		if (!sequenceId) { router.push("/sequences"); return; }
+		if (!sequenceId) { if (embedded) embedded.onClose(); else router.push("/sequences"); return; }
 		setSaving(true);
 		const response = await authFetch(`/api/sequences/${sequenceId}`, { method: "DELETE" });
 		setSaving(false);
-		if (response.ok) router.push("/sequences");
+		if (response.ok && embedded) { embedded.onDeleted?.(sequenceId); embedded.onClose(); }
+		else if (response.ok) router.push("/sequences");
 		else setNotice({ type: "error", text: t("sequences.saveFailed") });
 	}
 
@@ -106,9 +114,15 @@ export function SequenceEditor({ sequenceId }: { sequenceId: string | null }) {
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			<div className="flex h-14 shrink-0 items-center gap-1 border-b border-neutral-200 px-2 md:px-4">
-				<Tooltip label={t("sequences.back")}>
-					<Link href="/sequences" aria-label={t("sequences.back")} className="rounded-full p-2 text-neutral-600 hover:bg-neutral-100"><ArrowLeft className="h-5 w-5" /></Link>
-				</Tooltip>
+				{embedded ? (
+					<Tooltip label={t("common.cancel")}>
+						<button type="button" onClick={embedded.onClose} aria-label={t("common.cancel")} className="rounded-full p-2 text-neutral-600 hover:bg-neutral-100 max-md:bg-neutral-100 max-md:text-neutral-700"><X className="h-5 w-5" /></button>
+					</Tooltip>
+				) : (
+					<Tooltip label={t("sequences.back")}>
+						<Link href="/sequences" aria-label={t("sequences.back")} className="rounded-full p-2 text-neutral-600 hover:bg-neutral-100"><ArrowLeft className="h-5 w-5" /></Link>
+					</Tooltip>
+				)}
 				<input
 					aria-label={t("sequences.name")}
 					value={name}
@@ -173,7 +187,7 @@ export function SequenceEditor({ sequenceId }: { sequenceId: string | null }) {
 									<Plus className="h-4 w-4" aria-hidden />{t("sequences.addStep")}
 								</button>
 							)}
-							{sequenceId && (
+							{sequenceId && !embedded && (
 								<section className="mt-8">
 									<h2 className="border-b border-neutral-200 px-4.5 pb-2 text-sm font-medium text-neutral-900 md:px-6">{t("sequences.people")}</h2>
 									{people.length === 0 ? <p className="px-4.5 py-4 text-sm text-neutral-500 md:px-6">{t("sequences.noPeople")}</p> : (
@@ -214,5 +228,21 @@ export function SequenceEditor({ sequenceId }: { sequenceId: string | null }) {
 				/>
 			)}
 		</div>
+	);
+}
+
+/** The sequence editor as a sheet over the composer, like the template editor. */
+export function SequenceEditorWindow({ open, onOpenChange, sequenceId, onSaved, onDeleted }: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	sequenceId: string | null;
+	onSaved: (sequence: SequenceSummary) => void;
+	onDeleted?: (id: string) => void;
+}) {
+	const { t } = useLanguage();
+	return (
+		<EditorWindow open={open} onOpenChange={onOpenChange} title={sequenceId ? t("sequences.edit") : t("sequences.newSequence")}>
+			<SequenceEditor key={sequenceId ?? "new"} sequenceId={sequenceId} embedded={{ onClose: () => onOpenChange(false), onSaved, onDeleted }} />
+		</EditorWindow>
 	);
 }

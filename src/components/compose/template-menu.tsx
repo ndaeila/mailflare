@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ChevronRight, FilePlus2, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
@@ -13,6 +14,9 @@ const iconButton = "shrink-0 rounded p-1 text-neutral-400 opacity-0 hover:text-n
 export function TemplateMenu({ onApply, onNew, onEdit, onSaveCurrent }: TemplateMenuProps) {
 	const { t } = useLanguage();
 	const { templates, remove } = useTemplates();
+	// The pencil sits inside the row: a press on it turns the row's select into "edit", so the
+	// menu closes the normal way before the editor opens.
+	const editIntent = useRef(false);
 
 	return (
 		<DropdownMenu.Sub>
@@ -30,15 +34,19 @@ export function TemplateMenu({ onApply, onNew, onEdit, onSaveCurrent }: Template
 							{templates?.map((template) => (
 								<DropdownMenu.Item
 									key={template.id}
-									onSelect={() => onApply({ title: template.subject ?? "", html: template.htmlBody ?? textToHtml(template.textBody ?? "") })}
+									onPointerDownCapture={(event) => { editIntent.current = !!(event.target as HTMLElement).closest("[data-edit]"); }}
+									onSelect={() => {
+										if (editIntent.current) { editIntent.current = false; onEdit(template); return; }
+										onApply({ title: template.subject ?? "", html: template.htmlBody ?? textToHtml(template.textBody ?? "") });
+									}}
 									className={`${itemClass} group justify-between gap-1`}
 								>
 									<span className="min-w-0 flex-1 whitespace-normal break-words">{template.subject || t("template.untitled")}</span>
 									<button
 										type="button"
 										aria-label={t("template.edit")}
-										onPointerDown={(event) => event.stopPropagation()}
-										onClick={(event) => { event.stopPropagation(); onEdit(template); }}
+										data-edit=""
+										tabIndex={-1}
 										className={iconButton}
 									>
 										<Pencil className="h-3.5 w-3.5" />
@@ -47,6 +55,8 @@ export function TemplateMenu({ onApply, onNew, onEdit, onSaveCurrent }: Template
 										type="button"
 										aria-label={t("template.delete")}
 										onPointerDown={(event) => event.stopPropagation()}
+										// Radix selects the row on pointerup when it missed the pointerdown; keep both on the button.
+										onPointerUp={(event) => event.stopPropagation()}
 										onClick={(event) => { event.stopPropagation(); void remove(template.id); }}
 										className={`${iconButton} hover:text-red-600`}
 									>

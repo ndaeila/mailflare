@@ -2012,6 +2012,7 @@
 	"sequences.templateOpening": "Template opening",
 	"sequences.compare": "Compare",
 	"sequences.edit": "Edit",
+	"sequences.editSequence": "Edit sequence",
 	"sequences.fieldsToFill.one": "{count} field to fill",
 	"sequences.fieldsToFill.other": "{count} fields to fill",
 	"sequences.firstEmail": "First email",
