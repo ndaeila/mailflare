@@ -27,6 +27,8 @@ export function buildSendFormData(input: {
 	draftId?: string | null;
 	scheduledAt?: Date | null;
 	condition?: "no_reply";
+	/** JSON SendSequenceRequest: start a sequence with this email as its opening. */
+	sequence?: string;
 }): FormData {
 	const form = new FormData();
 	form.set("from", input.from);
@@ -43,6 +45,7 @@ export function buildSendFormData(input: {
 	if (input.draftId) form.set("draftId", input.draftId);
 	if (input.scheduledAt) form.set("scheduledAt", input.scheduledAt.toISOString());
 	if (input.scheduledAt && input.condition) form.set("condition", input.condition);
+	if (input.sequence) form.set("sequence", input.sequence);
 	for (const attachment of input.attachments) {
 		form.append("attachments", attachment.file);
 	}

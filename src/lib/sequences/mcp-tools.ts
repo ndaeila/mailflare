@@ -110,7 +110,7 @@ export function registerSequenceMcpTools(server: McpServer, env: CloudflareEnv, 
 			variables: z.record(z.string(), z.string()).optional(),
 			stepOverrides: z.record(z.string(), stepSchema).optional().describe("This person's edits to later steps, keyed by position (\"1\", \"2\", ...)."),
 			sendAt: z.string().max(40).optional().describe("ISO 8601 time with offset to schedule the opening instead of sending now."),
-			timeZone: z.string().max(64).optional().describe("IANA zone for step send times; defaults to the user's."),
+			timeZone: z.string().max(64).optional().describe("IANA zone (e.g. America/Los_Angeles) that step send times like 09:00 are in. Pass the user's zone; without it the account's zone, then the zone of their last sequence, then UTC is used."),
 		}),
 	}, async (args) => {
 		if (!principal.mailboxIds.includes(args.mailboxId)) return output({ error: "Permission denied" }, true);

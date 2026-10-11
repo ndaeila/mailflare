@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { ChevronUp, Ellipsis, FileText, Forward, Maximize2, Minimize2, Minus, Paperclip, Reply, Trash2, Undo2, X } from "lucide-react";
+import { ChevronRight, ChevronUp, Ellipsis, FileText, Forward, ListOrdered, Maximize2, Minimize2, Minus, Paperclip, Reply, Trash2, Undo2, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ScheduleSendDialog } from "./schedule-send-dialog";
 import { formatScheduledSendTime } from "@/components/messages/scheduled-send-utils";
@@ -37,6 +37,14 @@ import {
 import { headerToRecipients, isValidRecipient, recipientsToHeader } from "./recipient-utils";
 import type { ComposeAttachment, ComposeStoredAttachment, ComposeThreading } from "./types";
 import type { ComposeAttachmentPolicy } from "./attachment-policy-types";
+import { SequencePickerDialog } from "@/components/sequences/sequence-picker-dialog";
+import { SequenceTimeline } from "@/components/sequences/sequence-timeline";
+import { CompareOpeningsDialog } from "@/components/sequences/compare-openings-dialog";
+import { StepEditorPanel } from "@/components/sequences/step-editor";
+import { applyOverrides } from "@/components/sequences/sequence-ui-utils";
+import { getUserTimeZone } from "@/lib/time/utils";
+import type { SequenceStep, SequenceSummary } from "@/lib/sequences/types";
+import { BUILTIN_VARIABLES, builtinVariables, missingVariables, placeholdersIn, renderTemplate } from "@/lib/sequences/utils";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
@@ -84,6 +92,16 @@ export function ComposeForm({
 	const [loadedDraftMailboxId, setLoadedDraftMailboxId] = useState<string | null>(null);
 	const [loadedDraftFrom, setLoadedDraftFrom] = useState<string | null>(null);
 	const [selectedFrom, setSelectedFrom] = useState("");
+	// Sequence chosen for this email. The draft itself is never overwritten by it.
+	const [sequence, setSequence] = useState<SequenceSummary | null>(null);
+	const [sequenceOpening, setSequenceOpening] = useState<"draft" | "template">("draft");
+	const [sequenceValues, setSequenceValues] = useState<Record<string, string>>({});
+	const [sequenceOverrides, setSequenceOverrides] = useState<Record<number, SequenceStep>>({});
+	const [saveOpening, setSaveOpening] = useState(false);
+	const [sequenceView, setSequenceView] = useState<"timeline" | "editor">("timeline");
+	const [editingStep, setEditingStep] = useState<{ position: number; step: SequenceStep } | null>(null);
+	const [sequencePickerOpen, setSequencePickerOpen] = useState(false);
+	const [compareOpen, setCompareOpen] = useState(false);
 	const formRef = useRef<HTMLFormElement>(null);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const pendingSave = useRef<(() => Promise<void>) | null>(null);
@@ -122,6 +140,52 @@ export function ComposeForm({
 	const fromAddr = selectedMailbox && selectedFrom
 		? formatEmailAddress(selectedFrom, selectedMailbox.displayName)
 		: "";
+	const draftPreview = useMemo(
+		() => ({ subject: subject.trim(), text: htmlToPlainText(applyMailboxSignatureHtml(html, selectedMailbox?.signature, "")).trim() }),
+		[subject, html, selectedMailbox?.signature],
+	);
+	const hasDraftContent = !!(draftPreview.subject || draftPreview.text);
+	const sequenceSteps = useMemo(() => (sequence ? applyOverrides(sequence.steps, sequenceOverrides) : []), [sequence, sequenceOverrides]);
+	const recipientBuiltins = useMemo(() => builtinVariables(recipientsToHeader(to)), [to]);
+	const sequenceVariables = useMemo(
+		() => ({ ...recipientBuiltins, ...Object.fromEntries(Object.entries(sequenceValues).filter(([, value]) => value.trim())) }),
+		[recipientBuiltins, sequenceValues],
+	);
+	const sequenceStepsToRender = useMemo(() => (sequenceOpening === "template" ? sequenceSteps : sequenceSteps.slice(1)), [sequenceOpening, sequenceSteps]);
+	const sequenceFields = useMemo(() => {
+		const names = new Set(sequenceStepsToRender.flatMap((step) => placeholdersIn(`${step.subject}\n${step.body}`)));
+		return [...names].filter((name) => !(BUILTIN_VARIABLES as readonly string[]).includes(name) || !recipientBuiltins[name]);
+	}, [sequenceStepsToRender, recipientBuiltins]);
+	const showSequenceTimeline = !!sequence && sequenceView === "timeline";
+
+	function chooseSequence(next: SequenceSummary) {
+		setSequence(next);
+		setSequenceOpening(hasDraftContent ? "draft" : "template");
+		setSequenceValues({});
+		setSequenceOverrides({});
+		setSaveOpening(false);
+		setEditingStep(null);
+		setSequenceView("timeline");
+	}
+
+	function removeSequence() {
+		setSequence(null);
+		setSequenceOverrides({});
+		setSequenceValues({});
+		setSaveOpening(false);
+		setEditingStep(null);
+		setSequenceView("timeline");
+	}
+
+	/** "Edit" on the template opening: copy it into the composer as this email's own draft. */
+	function editTemplateOpening() {
+		if (!sequence) return;
+		const opening = sequenceSteps[0];
+		setSubject(renderTemplate(opening.subject, sequenceVariables).text);
+		setHtml(applyMailboxSignatureHtml(textToHtml(renderTemplate(opening.body, sequenceVariables).text), "", selectedMailbox?.signature));
+		setSequenceOpening("draft");
+		setSequenceView("editor");
+	}
 
 	useEffect(() => {
 		if (!senderAddresses.length) {
@@ -287,14 +351,29 @@ export function ComposeForm({
 			setToast({ type: "error", message: t("compose.error.invalidAddress", { address: invalid }) });
 			return;
 		}
-		if (!hasMeaningfulHtml(html) && !quotedHtml) {
+		const useTemplateOpening = !!sequence && sequenceOpening === "template";
+		if (sequence) {
+			const missing = missingVariables(sequenceStepsToRender, sequenceVariables);
+			if (missing.length) {
+				setSequenceView("timeline");
+				setToast({ type: "error", message: t("sequences.missingFields", { fields: missing.join(", ") }) });
+				return;
+			}
+			if (!useTemplateOpening && !subject.trim()) {
+				setSequenceView("editor");
+				setToast({ type: "error", message: t("sequences.subjectRequired") });
+				return;
+			}
+		}
+		if (!useTemplateOpening && !hasMeaningfulHtml(html) && !quotedHtml) {
 			setToast({ type: "error", message: t("compose.error.emptyBody") });
 			return;
 		}
 		if (saveTimer.current) clearTimeout(saveTimer.current);
 		pendingSave.current = null;
 		setLoading(true);
-		const fullHtml = joinQuotedHtml(html, quotedHtml);
+		const templateText = useTemplateOpening ? renderTemplate(sequenceSteps[0].body, sequenceVariables).text : "";
+		const fullHtml = useTemplateOpening ? textToHtml(templateText) : joinQuotedHtml(html, quotedHtml);
 		if (draftId && agentRevision !== null) {
 			try {
 				if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -331,14 +410,22 @@ export function ComposeForm({
 					to: recipientsToHeader(to),
 					cc: recipientsToHeader(cc),
 					bcc: recipientsToHeader(bcc),
-					subject,
-					text: htmlToPlainText(fullHtml),
+					subject: useTemplateOpening ? renderTemplate(sequenceSteps[0].subject, sequenceVariables).text : subject,
+					text: useTemplateOpening ? templateText : htmlToPlainText(fullHtml),
 					html: fullHtml,
 					mailboxId: selectedMailbox?.id,
 					threading: threading ?? undefined,
 					draftId,
 					scheduledAt: sendAt,
 					condition: sendAt && withCondition ? "no_reply" : undefined,
+					sequence: sequence ? JSON.stringify({
+						sequenceId: sequence.id,
+						variables: Object.fromEntries(Object.entries(sequenceValues).filter(([, value]) => value.trim())),
+						stepOverrides: sequenceOverrides,
+						saveOpening: !useTemplateOpening && saveOpening,
+						useTemplateOpening,
+						timeZone: getUserTimeZone(),
+					}) : undefined,
 				}),
 			});
 			data = (await res.json()) as { messageId?: string; scheduled?: boolean; error?: string };
@@ -373,6 +460,7 @@ export function ComposeForm({
 		setQuotedHtml(null);
 		setAttachments([]);
 		setScheduledAt(null);
+		removeSequence();
 		showNotice(data.scheduled ? t("compose.scheduled") : t("compose.sent"));
 		window.dispatchEvent(new Event("mailflare:messages-changed"));
 
@@ -607,6 +695,12 @@ export function ComposeForm({
 									<ScheduledSendIcon className="h-5 w-5" />
 									{t("schedule.send")}
 								</DropdownMenu.Item>
+								{agentRevision === null && (
+									<DropdownMenu.Item onSelect={() => setSequencePickerOpen(true)} disabled={!fromAddr} className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-neutral-900 outline-none hover:bg-neutral-100 focus:bg-neutral-100 data-[disabled]:opacity-50">
+										<ListOrdered className="h-5 w-5" />
+										{t("sequences.use")}
+									</DropdownMenu.Item>
+								)}
 								<DropdownMenu.Item onSelect={() => void deleteDraftAndClose()} disabled={deletingDraft} className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-red-600 outline-none hover:bg-red-50 focus:bg-red-50 data-[disabled]:opacity-50">
 									<Trash2 className="h-5 w-5" />
 									{t("compose.discard")}
@@ -629,8 +723,33 @@ export function ComposeForm({
 					)}
 					</div>
 					<ScheduleSendDialog open={headerScheduleOpen} onOpenChange={setHeaderScheduleOpen} onSchedule={(value, options) => void submit(value, options)} initialCancelIfReply={cancelIfReply} />
+					<SequencePickerDialog open={sequencePickerOpen} onOpenChange={setSequencePickerOpen} onPick={chooseSequence} hasDraft={hasDraftContent} />
+					{sequence && (
+						<CompareOpeningsDialog
+							open={compareOpen}
+							onOpenChange={setCompareOpen}
+							draft={draftPreview}
+							template={sequenceSteps[0]}
+							variables={sequenceVariables}
+							current={sequenceOpening}
+							saveOpening={saveOpening}
+							onChoose={(choice, save) => { setSequenceOpening(choice); setSaveOpening(save); }}
+						/>
+					)}
 				</div>
-				<div className={cn("flex min-h-0 flex-1 flex-col", minimized && "hidden")}>
+				<div className={cn("relative flex min-h-0 flex-1 flex-col", minimized && "hidden")}>
+				{sequence && editingStep && (
+					<div className="absolute inset-0 z-20">
+						<StepEditorPanel
+							title={t("sequences.stepTitle", { name: sequence.name, step: editingStep.position + 1 })}
+							step={editingStep.step}
+							position={editingStep.position}
+							onChange={(step) => setEditingStep({ position: editingStep.position, step })}
+							onBack={() => setEditingStep(null)}
+							onDone={() => { setSequenceOverrides((current) => ({ ...current, [editingStep.position]: editingStep.step })); setEditingStep(null); }}
+						/>
+					</div>
+				)}
 				{skippedSend && (
 					<div role="status" className="flex items-start gap-2 border-b border-neutral-200 bg-blue-50 px-4 py-2.5 text-sm text-neutral-800">
 						<Undo2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" aria-hidden />
@@ -702,6 +821,62 @@ export function ComposeForm({
 						autoFocus={!loadingDraft && bcc.length === 0}
 					/>
 				)}
+				{showSequenceTimeline && sequence && (
+					<>
+						<SequenceTimeline
+							steps={sequenceSteps}
+							opening={sequenceOpening}
+							draft={draftPreview}
+							variables={sequenceVariables}
+							fields={sequenceFields}
+							values={sequenceValues}
+							onValueChange={(name, value) => setSequenceValues((current) => ({ ...current, [name]: value }))}
+							scheduledAt={scheduledAt}
+							onEditDraft={() => setSequenceView("editor")}
+							onCompare={() => setCompareOpen(true)}
+							onEditTemplate={editTemplateOpening}
+							onEditStep={(position) => setEditingStep({ position, step: sequenceSteps[position] })}
+						/>
+						<div className="flex shrink-0 items-center gap-3 border-t border-neutral-100 px-3 py-2.5">
+							<div className="flex items-center">
+								<Button type="submit" size="sm" disabled={loading || loadingDraft || !fromAddr} className="rounded-r-none px-4">
+									{loading ? t("compose.preparing") : scheduledAt ? t("compose.schedule") : t("compose.send")}
+								</Button>
+								<ScheduleSendMenu
+									disabled={loading || loadingDraft || !fromAddr}
+									value={scheduledAt}
+									onChange={setScheduledAt}
+									onScheduleSend={(value, options) => void submit(value, options)}
+									cancelIfReply={cancelIfReply}
+									mailboxId={selectedMailbox?.id}
+									from={fromAddr}
+									onApplyTemplate={({ title, html: templateHtml }) => {
+										setSubject((current) => current.trim() ? current : title);
+										setHtml((current) => (hasMeaningfulHtml(current) ? `${current}${templateHtml}` : templateHtml));
+										setSequenceOpening("draft");
+										setSequenceView("editor");
+									}}
+								/>
+							</div>
+							<span className="min-w-0 flex-1 text-xs leading-4 text-neutral-500">
+								{sequenceSteps.slice(1).some((step) => step.condition === "no_reply") ? t("sequences.footer", { name: sequence.name }) : sequence.name}
+							</span>
+							<Tooltip label={t("sequences.remove")}>
+								<button type="button" onClick={removeSequence} aria-label={t("sequences.remove")} className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900">
+									<X className="h-4 w-4" />
+								</button>
+							</Tooltip>
+						</div>
+					</>
+				)}
+				{sequence && !showSequenceTimeline && (
+					<button type="button" onClick={() => setSequenceView("timeline")} className="flex shrink-0 items-center gap-2 border-b border-neutral-100 bg-blue-50 px-4 py-2 text-left text-sm text-blue-800 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-200">
+						<ListOrdered className="h-4 w-4 shrink-0" aria-hidden />
+						<span className="min-w-0 flex-1 truncate">{t("sequences.stepOf", { name: sequence.name })}</span>
+						<span className="flex shrink-0 items-center font-medium">{t("sequences.viewSequence")}<ChevronRight className="h-4 w-4" aria-hidden /></span>
+					</button>
+				)}
+				<div className={cn("flex min-h-0 flex-1 flex-col", showSequenceTimeline && "hidden")}>
 				<div className="border-b border-neutral-100 px-4 py-1">
 					<Label htmlFor={`${mode}-subject`} className="sr-only">{t("compose.subject")}</Label>
 					<Input
@@ -709,7 +884,7 @@ export function ComposeForm({
 						value={subject}
 						onChange={(event) => setSubject(event.target.value)}
 						placeholder={t("compose.subject")}
-						required
+						required={!sequence}
 						disabled={loadingDraft}
 						className="h-8 border-0 px-0 py-1 shadow-none focus-visible:ring-0"
 					/>
@@ -786,6 +961,7 @@ export function ComposeForm({
 						</>
 					}
 				/>
+				</div>
 				</div>
 			</form>
 		</>

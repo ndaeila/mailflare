@@ -19,6 +19,7 @@ import { ConversationThread } from "@/components/messages/conversation-thread";
 import { MessageDetailNavigation } from "@/components/messages/message-detail-navigation";
 import { MessageReadingHeaderButton } from "@/components/messages/message-reading-header-button";
 import { ScheduledSendBanner } from "@/components/messages/scheduled-send-banner";
+import { SequenceThreadBanner } from "@/components/sequences/sequence-thread-banner";
 import { formatScheduledSendTime } from "@/components/messages/scheduled-send-utils";
 import { QuotedEmailToggle } from "@/components/messages/quoted-email-toggle";
 import { ThreadMessageActions } from "@/components/messages/thread-message-actions";
@@ -274,6 +275,7 @@ export default function MessageDetailPage() {
               />
             </div>
           </div>
+          <div className="sm:pl-10"><SequenceThreadBanner messageId={message.id} /></div>
           {scheduledAt && <div className="sm:pl-10"><ScheduledSendBanner messageId={message.id} scheduledAt={scheduledAt} condition={scheduledCondition} /></div>}
           <div className="prose max-w-none text-neutral-900 sm:pl-16">
             {htmlBody ? (

@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Star,
   Trash2,
+  ListOrdered,
 } from "lucide-react";
 import { ScheduledSendIcon } from "@/components/icons/scheduled-send-icon";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
@@ -63,6 +64,7 @@ const links = [
   { href: "/snoozed", labelKey: "navigation.snoozed", icon: Clock, preloadMessages: true },
   { href: "/sent", labelKey: "navigation.sent", icon: Send, preloadMessages: true },
   { href: "/scheduled", labelKey: "navigation.scheduled", icon: ScheduledSendIcon, preloadMessages: true },
+  { href: "/sequences", labelKey: "navigation.sequences", icon: ListOrdered },
   { href: "/drafts", labelKey: "navigation.drafts", icon: FileText, preloadMessages: true },
   {
     href: "/archived",

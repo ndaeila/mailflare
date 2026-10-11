@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { messages, outboundJobs, sequenceEnrollments, sequences, users } from "@/db/schema";
 import { textToHtml } from "@/components/compose/rich-text-utils";
@@ -116,7 +116,10 @@ export async function startEnrollment(env: CloudflareEnv, userId: string, input:
 	if (missing.length) throw new Error(`Fill in ${missing.map((name) => `{{${name}}}`).join(", ")} before starting this sequence`);
 
 	const [user] = await db.select({ timeZone: users.timeZone }).from(users).where(eq(users.id, userId)).limit(1);
-	const timeZone = normalizeTimeZone(input.timeZone || user?.timeZone || "UTC");
+	// Without a zone from the caller or the profile, reuse the one this person's last sequence ran in.
+	const [previous] = input.timeZone || user?.timeZone ? [] : await db.select({ timeZone: sequenceEnrollments.timeZone }).from(sequenceEnrollments)
+		.where(and(eq(sequenceEnrollments.userId, userId), ne(sequenceEnrollments.timeZone, "UTC"))).orderBy(desc(sequenceEnrollments.createdAt)).limit(1);
+	const timeZone = normalizeTimeZone(input.timeZone || user?.timeZone || previous?.timeZone || "UTC");
 	const now = new Date();
 	const enrollmentId = newId("enr");
 	await db.insert(sequenceEnrollments).values({
