@@ -58,6 +58,20 @@ export function formatMessageListTimestamp(createdAt: string): string {
 	return formatUserDate(createdAt, { month: "short", day: "2-digit", year: "numeric" });
 }
 
+/** Scheduled sends show when they will go out ("Mon 10:15 AM"), like Gmail's Scheduled folder. */
+export function formatScheduledListTimestamp(scheduledAt: string): string {
+	const withinWeek = new Date(scheduledAt).getTime() - Date.now() < 6 * 24 * 60 * 60 * 1000;
+	return formatUserDate(scheduledAt, withinWeek
+		? { weekday: "short", hour: "numeric", minute: "2-digit" }
+		: { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+/** The time a list row shows: the send time for scheduled mail, otherwise when it arrived or was written. */
+export function getMessageListTimestamp(message: Pick<Message, "createdAt" | "scheduledAt">): { dateTime: string; label: string } {
+	if (message.scheduledAt) return { dateTime: message.scheduledAt, label: formatScheduledListTimestamp(message.scheduledAt) };
+	return { dateTime: message.createdAt, label: formatMessageListTimestamp(message.createdAt) };
+}
+
 export function getPageRange(offset: number, count: number, total: number): PageRange {
 	if (total === 0 || count === 0) return { start: 0, end: 0, total };
 

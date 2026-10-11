@@ -326,5 +326,7 @@ export async function processOutboundQueue(
 		return;
 	}
 	delivery.attachments = await loadMessageAttachmentContents(env, payload.messageId);
+	const [current] = await db.select({ status: outboundJobs.status }).from(outboundJobs).where(eq(outboundJobs.id, payload.jobId)).limit(1);
+	if (current?.status !== "queued") return;
 	await deliverEmail(env, delivery);
 }

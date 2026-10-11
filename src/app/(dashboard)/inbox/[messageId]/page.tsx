@@ -38,6 +38,7 @@ import {
 } from "./utils";
 import { extractCloudAttachments } from "./cloud-attachment-utils";
 import { EmailHtmlRenderer } from "@/components/messages/email-html-renderer";
+import { ScheduledSendBanner } from "@/components/messages/scheduled-send-banner";
 import clsx from "clsx";
 import { useAssistantOpen } from "@/components/agent/assistant-open-state";
 import { useMessageContentScroll } from "./use-message-content-scroll";
@@ -182,9 +183,10 @@ export default function MessageDetailPage() {
     <div ref={scrollRef} onScroll={handleScroll} className="h-full overflow-y-auto overscroll-contain scrollbar-gutter-stable flex-1 min-h-0">
       {!message.read && <MarkAsRead messageId={message.id} />}
 
-      <h1 className={clsx(!isAnyPanelVisible ? "pl-16" : "pl-10", "pr-6 pb-2 pt-2 text-2xl text-neutral-900")} title={message.subject ?? t("list.noSubject")}>
+      <h1 className={clsx(!isAnyPanelVisible ? "sm:pl-16" : "sm:pl-10", "pl-3 pr-3 pb-2 pt-2 text-2xl text-neutral-900 sm:pr-6")} title={message.subject ?? t("list.noSubject")}>
         {message.subject ?? t("list.noSubject")}
       </h1>
+      {message.direction === "outbound" && message.status === "queued" && <ScheduledSendBanner messageId={message.id} />}
       {/* <div className="px-6">
         <div className="mx-auto w-full max-w-[640px]">
           <SpamScoreDetails

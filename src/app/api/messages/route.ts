@@ -13,6 +13,7 @@ import { buildSearchConditions } from "@/lib/search/conditions";
 import { getRequestTimeZone } from "@/lib/time/utils";
 import { getMessageListColumns, loadConversationPage } from "./utils";
 import type { ListMessage } from "./types";
+import { getScheduledTimes } from "@/lib/email/scheduled";
 
 export async function GET(request: Request) {
 	const env = getEnv();
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
 	const offset = Math.max(Number(url.searchParams.get("offset") ?? 0), 0);
 	// Conversation view: one row per thread, represented by its newest message
 	// that matches the filter. Drafts are never grouped.
-	const groupByThread = url.searchParams.get("group") === "thread" && status !== "draft";
+	const groupByThread = url.searchParams.get("group") === "thread" && status !== "draft" && status !== "queued";
 
 	const db = getDb(env);
 	const accessibleMailboxes = await listAccessibleMailboxes(db, user);
@@ -179,6 +180,7 @@ export async function GET(request: Request) {
 	// `Message.textBody`/`htmlBody` are optional on the wire type and the
 	// reading pane loads them from /api/messages/[id]/thread, so they are
 	// neither selected nor sent here.
+	const scheduledTimes = status === "queued" ? await getScheduledTimes(env, rows.map((row) => row.id)) : null;
 	const enrichedRows = rows.map(({ rawR2Key: _rawR2Key, ...message }) => {
 		const contactMap = contactMapsByUserId.get(message.userId);
 		const accountName = message.mailboxId ? mailboxNameMap.get(message.mailboxId) : null;
@@ -192,6 +194,7 @@ export async function GET(request: Request) {
 			toContactName: contactMap?.get(normalizeEmailAddress(getFirstEmailAddressEntry(message.toAddr))) ?? null,
 			threadCount: (message.threadId && threadCounts.get(message.threadId)?.total) || 1,
 			threadUnread: (message.threadId && threadCounts.get(message.threadId)?.unread) || 0,
+			...(scheduledTimes ? { scheduledAt: scheduledTimes.get(message.id)?.toISOString() ?? null } : {}),
 			...(groupByThread
 				? { threadMessageIds: threadMessageIds.get(message.threadId ?? message.id) ?? [message.id] }
 				: {}),

@@ -1,6 +1,6 @@
 export type MessageStatus = "received" | "sent" | "draft" | "queued" | "failed" | "archived" | "trash" | "spam";
 
-export type MessageFolder = "inbox" | "starred" | "snoozed" | "sent" | "drafts" | "archived" | "trash" | "spam";
+export type MessageFolder = "inbox" | "starred" | "snoozed" | "sent" | "scheduled" | "drafts" | "archived" | "trash" | "spam";
 
 export type MessageDirection = "inbound" | "outbound";
 
@@ -27,6 +27,8 @@ export type Message = {
 	read: boolean;
 	starred: boolean;
 	snoozedUntil?: string | null;
+	/** Delivery time for a scheduled send, when listed in the Scheduled folder. */
+	scheduledAt?: string | null;
 	threadId: string | null;
 	inReplyTo?: string | null;
 	references?: string | null;

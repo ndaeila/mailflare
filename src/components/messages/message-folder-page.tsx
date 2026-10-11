@@ -26,7 +26,7 @@ import { rememberOpenedUnreadMessage } from "./message-detail-navigation-utils";
 import { useConversationView } from "./use-conversation-view";
 import type { MessageFolderPageProps, MessageListRowProps, RowMessageAction } from "./types";
 import {
-	formatMessageListTimestamp,
+	getMessageListTimestamp,
 	getPageRange,
 	getMessageParty,
 	getMessagePartyClassName,
@@ -149,7 +149,7 @@ function MessageListRow({
 							)}
 						</span>
 						<span className={clsx(unread ?"font-medium":"text-neutral-400","shrink-0 text-[11px]")}>
-							{formatMessageListTimestamp(message.createdAt)}
+							{getMessageListTimestamp(message).label}
 						</span>
 					</span>
 					<span
@@ -224,11 +224,11 @@ function MessageListRow({
 				<span className="text-neutral-500"> - {getMessagePreview(rowMessage, config.folder, t)}</span>
 			</span>
 			<time
-				dateTime={message.createdAt}
+				dateTime={getMessageListTimestamp(message).dateTime}
 				className={`min-w-[96px] whitespace-nowrap text-right text-xs group-hover:opacity-0 ${unread ? "font-semibold text-neutral-800" : "text-neutral-500"
 					}`}
 			>
-				{formatMessageListTimestamp(message.createdAt)}
+				{getMessageListTimestamp(message).label}
 			</time>
 		</>
 	);

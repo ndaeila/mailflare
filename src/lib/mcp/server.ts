@@ -7,6 +7,7 @@ import { listAccessibleMailboxes } from "@/lib/mailboxes/access";
 import { runEmailTool, EMAIL_TOOL_NAMES, emailToolDescriptions, emailToolSchemas } from "@/lib/agent/tools";
 import { editAgentDraft } from "@/lib/agent/edit-draft";
 import { requestAgentSend, getAgentSendRequest, sendAgentDraftDirect } from "@/lib/agent/approvals/utils";
+import { cancelScheduledSend, getScheduledTimes } from "@/lib/email/scheduled";
 import type { EmailToolName } from "@/lib/agent/types";
 import type { McpPrincipal } from "./types";
 import { registerAdminMcpTools } from "./admin-tools";
@@ -81,6 +82,20 @@ export function createMailflareMcpHandler(env: CloudflareEnv, principal: McpPrin
 			return sendDraft(args.mailboxId, created.draftId, created.revision);
 		});
 		}
+		server.registerTool("get_scheduled_send", { description: "Get when a scheduled email (listed in the scheduled folder) will be sent.", inputSchema: z.object({ mailboxId: z.string(), messageId: z.string() }) }, async ({ mailboxId, messageId }) => {
+			if (!principal.scopes.includes("mcp:read") || !principal.mailboxIds.includes(mailboxId)) return output({ error: "Permission denied" }, true);
+			const [row] = await getDb(env).select({ mailboxId: messages.mailboxId, status: messages.status }).from(messages).where(eq(messages.id, messageId)).limit(1);
+			const scheduledAt = row?.mailboxId === mailboxId && row.status === "queued" ? (await getScheduledTimes(env, [messageId])).get(messageId) : undefined;
+			return scheduledAt ? output({ messageId, scheduledAt: scheduledAt.toISOString() }) : output({ error: "Scheduled email not found" }, true);
+		});
+		server.registerTool("cancel_scheduled_send", { description: "Cancel a scheduled email before it goes out. It becomes a regular draft in Drafts and is not sent.", inputSchema: z.object({ mailboxId: z.string(), messageId: z.string() }) }, async ({ mailboxId, messageId }) => {
+			if (!principal.scopes.includes("mcp:draft") || !principal.mailboxIds.includes(mailboxId)) return output({ error: "Permission denied" }, true);
+			const [row] = await getDb(env).select({ mailboxId: messages.mailboxId, status: messages.status }).from(messages).where(eq(messages.id, messageId)).limit(1);
+			if (row?.mailboxId !== mailboxId || row.status !== "queued") return output({ error: "Scheduled email not found" }, true);
+			return await cancelScheduledSend(env, messageId)
+				? output({ messageId, status: "cancelled", draftId: messageId })
+				: output({ error: "This email is already sending or was sent" }, true);
+		});
 		server.registerTool("get_send_request", { description: "Read the status of this key's send review request", inputSchema: z.object({ approvalId: z.string() }) }, async ({ approvalId }) => {
 			if (!principal.scopes.includes("mcp:request-send")) return output({ error: "Permission denied" }, true);
 			const [row] = await getDb(env).select({ keyId: agentSendApprovals.requestKeyId }).from(agentSendApprovals).where(eq(agentSendApprovals.id, approvalId)).limit(1);

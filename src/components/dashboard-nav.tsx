@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   Archive,
+  CalendarClock,
   Clock,
   FileText,
   Folder,
@@ -61,6 +62,7 @@ const links = [
   { href: "/starred", labelKey: "navigation.starred", icon: Star, preloadMessages: true },
   { href: "/snoozed", labelKey: "navigation.snoozed", icon: Clock, preloadMessages: true },
   { href: "/sent", labelKey: "navigation.sent", icon: Send, preloadMessages: true },
+  { href: "/scheduled", labelKey: "navigation.scheduled", icon: CalendarClock, preloadMessages: true },
   { href: "/drafts", labelKey: "navigation.drafts", icon: FileText, preloadMessages: true },
   {
     href: "/archived",
@@ -121,6 +123,10 @@ export function DashboardNav({ className }: { className?: string }) {
     }
     if (link.href === "/sent") {
       return { ...link, count: getFolderNavCount("sent", counts.folders) };
+    }
+    if (link.href === "/scheduled") {
+      // Like Gmail, Scheduled shows how many sends are waiting, not an unread count.
+      return { ...link, count: counts.folders.scheduled.total || undefined };
     }
     if (link.href === "/drafts") {
       return { ...link, count: getFolderNavCount("drafts", counts.folders) };
