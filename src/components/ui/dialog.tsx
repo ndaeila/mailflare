@@ -16,13 +16,15 @@ export function DialogContent({
 	closeLabel,
 	overlayClassName,
 	closeClassName,
+	contentRef,
 	...props
-}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { closeLabel?: string; overlayClassName?: string; closeClassName?: string }) {
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { closeLabel?: string; overlayClassName?: string; closeClassName?: string; contentRef?: React.Ref<HTMLDivElement> }) {
 	const { t } = useLanguage();
 	return (
 		<DialogPrimitive.Portal>
 			<DialogPrimitive.Overlay className={cn("dialog-overlay fixed inset-0 z-50 bg-black/35", overlayClassName)} />
 			<DialogPrimitive.Content
+				ref={contentRef}
 				className={cn(
 					"dialog-content fixed left-1/2 top-1/2 z-50 w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-xl",
 					className,

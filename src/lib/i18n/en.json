@@ -2092,9 +2092,9 @@
 	"sequences.done": "Done",
 	"sequences.onlyFor": "only for {who}",
 	"sequences.subjectRequired": "Add a subject before sending",
-	"editor.hideFormatting": "Hide formatting",
 	"template.edit": "Edit template",
 	"template.required": "Add a subject and a message",
 	"template.saveCurrent": "Save this email as a template",
-	"template.templates": "Templates"
+	"template.templates": "Templates",
+	"editor.formatting": "Formatting"
 }

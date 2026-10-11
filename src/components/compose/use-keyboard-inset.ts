@@ -1,53 +1,111 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-const PHONE_QUERY = "(max-width: 767px)";
-
-export type VisibleViewportBox = {
-	/** Distance Safari has scrolled the visible area down from the top of the layout viewport. */
-	top: number;
-	height: number;
-	/** How much of the layout viewport's bottom is covered (keyboard and its bars). */
-	bottomInset: number;
-};
+import { useEffect, useLayoutEffect } from "react";
+import { canScrollFurther, findScroller } from "./scroll-lock-utils";
 
 /**
- * On phones, the part of the screen that is actually visible: above the keyboard and wherever
- * Safari has scrolled to. Undefined on larger screens.
+ * Stops the page moving under a phone sheet, the way a native sheet holds still.
+ *
+ * With the keyboard up, iOS lets a drag pan the whole page over the keyboard: the sheet's header
+ * slides under the status bar, black shows below it, and the inbox behind scrolls. A non-passive
+ * touchmove listener cancels every drag except one that scrolls an inner scroller (the message
+ * body, the formatting row, a menu) that still has room to move in that direction.
  */
-export function useVisibleViewportBox(): VisibleViewportBox | undefined {
-	const [box, setBox] = useState<VisibleViewportBox | undefined>(undefined);
+export function usePhoneScrollLock(enabled: boolean) {
 	useEffect(() => {
-		const viewport = window.visualViewport;
-		const query = window.matchMedia(PHONE_QUERY);
-		if (!viewport) return;
-		const update = () => {
-			if (!query.matches) { setBox(undefined); return; }
-			const top = Math.round(viewport.offsetTop);
-			const height = Math.round(viewport.height);
-			setBox({ top, height, bottomInset: Math.max(0, Math.round(window.innerHeight - top - height)) });
+		if (!enabled || !window.matchMedia("(pointer: coarse)").matches) return;
+		let startX = 0;
+		let startY = 0;
+		const onStart = (event: TouchEvent) => {
+			startX = event.touches[0]?.clientX ?? 0;
+			startY = event.touches[0]?.clientY ?? 0;
 		};
-		update();
-		viewport.addEventListener("resize", update);
-		viewport.addEventListener("scroll", update);
-		query.addEventListener("change", update);
+		const onMove = (event: TouchEvent) => {
+			if (event.touches.length > 1) return; // pinch zoom stays available
+			const touch = event.touches[0];
+			const dx = touch.clientX - startX;
+			const dy = touch.clientY - startY;
+			const scroller = findScroller(event.target as Element | null, Math.abs(dx) > Math.abs(dy) ? "x" : "y");
+			if (scroller && canScrollFurther(scroller, dx, dy)) return;
+			if (event.cancelable) event.preventDefault();
+		};
+		document.addEventListener("touchstart", onStart, { passive: true });
+		document.addEventListener("touchmove", onMove, { passive: false });
 		return () => {
-			viewport.removeEventListener("resize", update);
-			viewport.removeEventListener("scroll", update);
-			query.removeEventListener("change", update);
+			document.removeEventListener("touchstart", onStart);
+			document.removeEventListener("touchmove", onMove);
 		};
-	}, []);
-	return box;
+	}, [enabled]);
 }
+
+const PHONE_QUERY = "(max-width: 767px)";
 
 /** Gap above a phone sheet where the page behind, shrunk back like an iOS card, peeks out. */
 export const PHONE_SHEET_GAP = 20;
 
 /**
- * A phone sheet runs to the bottom of the screen, so its white continues under the keyboard and
- * Safari's bars; its content is padded to end where the visible area does.
+ * Keeps a phone sheet glued to the part of the screen that is actually visible.
+ *
+ * When the keyboard opens and on every caret move, Safari pans the visible area over the page.
+ * Fixed elements move with that pan, so a sheet positioned once would slide off the top until
+ * something caught up. This writes top/height straight to the element on every frame while the
+ * viewport is moving (no React render in between), so the sheet holds still on screen. `cover`
+ * hides the gap above the sheet while panned, where a slice of the page would show through.
  */
-export function phoneSheetStyle(box: VisibleViewportBox | undefined): React.CSSProperties | undefined {
-	return box ? { top: box.top + PHONE_SHEET_GAP, paddingBottom: box.bottomInset } : undefined;
+export function usePhoneSheetPosition(
+	sheet: React.RefObject<HTMLElement | null>,
+	cover: React.RefObject<HTMLElement | null> | null,
+	enabled: boolean,
+) {
+	useLayoutEffect(() => {
+		const viewport = window.visualViewport;
+		const query = window.matchMedia(PHONE_QUERY);
+		if (!enabled || !viewport) return;
+		let frame = 0;
+		let until = 0;
+		const apply = () => {
+			const element = sheet.current;
+			if (!element) return;
+			if (!query.matches) {
+				element.style.setProperty("top", "");
+				element.style.setProperty("height", "");
+				if (cover?.current) cover.current.style.setProperty("display", "none");
+				return;
+			}
+			const top = viewport.offsetTop;
+			element.style.setProperty("top", `${top + PHONE_SHEET_GAP}px`);
+			element.style.setProperty("height", `${viewport.height - PHONE_SHEET_GAP}px`);
+			if (cover?.current) {
+				cover.current.style.setProperty("display", top > 2 ? "block" : "none");
+				cover.current.style.setProperty("top", `${top}px`);
+				cover.current.style.setProperty("height", `${PHONE_SHEET_GAP + 2}px`);
+			}
+		};
+		const tick = () => {
+			apply();
+			if (performance.now() < until) frame = requestAnimationFrame(tick);
+		};
+		// Safari reports the pan late and in steps; follow it frame by frame for a moment.
+		const follow = () => {
+			until = performance.now() + 1000;
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(tick);
+		};
+		apply();
+		viewport.addEventListener("resize", follow);
+		viewport.addEventListener("scroll", follow);
+		document.addEventListener("focusin", follow);
+		document.addEventListener("focusout", follow);
+		document.addEventListener("selectionchange", follow);
+		query.addEventListener("change", apply);
+		return () => {
+			cancelAnimationFrame(frame);
+			viewport.removeEventListener("resize", follow);
+			viewport.removeEventListener("scroll", follow);
+			document.removeEventListener("focusin", follow);
+			document.removeEventListener("focusout", follow);
+			document.removeEventListener("selectionchange", follow);
+			query.removeEventListener("change", apply);
+		};
+	}, [sheet, cover, enabled]);
 }

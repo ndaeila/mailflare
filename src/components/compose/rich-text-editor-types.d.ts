@@ -19,6 +19,8 @@ export type RichTextEditorProps = {
 	editorApi?: React.MutableRefObject<RichTextEditorApi | null>;
 	/** Extra buttons for the phone formatting bar (toolbarStart/End are desktop-only there). */
 	mobileToolbarExtra?: React.ReactNode;
+	/** Phones: show the formatting row (toggled by the sheet's Aa button) under the subject. */
+	phoneToolbarOpen?: boolean;
 };
 
 export type RichTextEditorApi = {
