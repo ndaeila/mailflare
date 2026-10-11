@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronRight, ListOrdered, Settings2 } from "lucide-react";
+import { ChevronRight, ListOrdered, Pencil, Plus, Settings2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { authFetch } from "@/lib/auth/client";
@@ -41,11 +40,19 @@ export function useFinePointer(): boolean {
 
 /** ⋯ → Sequences ▸, like Gmail's Templates submenu. Picking one never changes the draft.
  * On touch screens it is a plain item that opens SequencesSheet instead. */
-export function SequencesSubmenu({ onPick, onOpenSheet, disabled }: { onPick: (sequence: SequenceSummary) => void; onOpenSheet: () => void; disabled?: boolean }) {
+export function SequencesSubmenu({ onPick, onOpenSheet, onEdit, onCreate, disabled }: {
+	onPick: (sequence: SequenceSummary) => void;
+	onOpenSheet: () => void;
+	/** Open a sequence, or a new one, in the editor sheet over the composer. */
+	onEdit: (sequence: SequenceSummary) => void;
+	onCreate: () => void;
+	disabled?: boolean;
+}) {
 	const { t } = useLanguage();
-	const router = useRouter();
 	const finePointer = useFinePointer();
 	const sequences = useSequenceList(finePointer);
+	// A press on a row's pencil turns its select into "edit", so the menu closes normally first.
+	const editIntent = useRef(false);
 
 	if (!finePointer) {
 		return (
@@ -73,18 +80,40 @@ export function SequencesSubmenu({ onPick, onOpenSheet, disabled }: { onPick: (s
 						</DropdownMenu.Item>
 					)}
 					{sequences?.map((sequence) => (
-						<DropdownMenu.Item key={sequence.id} onSelect={() => onPick(sequence)} className={`${itemClass} items-start`}>
+						<DropdownMenu.Item
+							key={sequence.id}
+							onPointerDownCapture={(event) => { editIntent.current = !!(event.target as HTMLElement).closest("[data-edit]"); }}
+							onSelect={() => { if (editIntent.current) { editIntent.current = false; onEdit(sequence); } else onPick(sequence); }}
+							className={`${itemClass} group items-start`}
+						>
 							<span className="min-w-0 flex-1">
 								<span className="block truncate">{sequence.name}</span>
 								<span className="block truncate text-xs text-neutral-500">{followUpSummary(sequence.steps, t)}</span>
 							</span>
+							<button
+								type="button"
+								aria-label={t("sequences.editSequence")}
+								data-edit=""
+								tabIndex={-1}
+								className="shrink-0 rounded-full p-1.5 text-neutral-500 opacity-0 hover:bg-neutral-200 hover:text-neutral-900 focus:opacity-100 group-hover:opacity-100 group-data-[highlighted]:opacity-100"
+							>
+								<Pencil className="h-3.5 w-3.5" />
+							</button>
 						</DropdownMenu.Item>
 					))}
 					<DropdownMenu.Separator className="my-1 h-px bg-neutral-200" />
-					<DropdownMenu.Item onSelect={() => router.push(sequences?.length ? "/sequences" : "/sequences/new")} className={itemClass}>
-						<Settings2 className="h-4 w-4 text-neutral-600" />
-						<span className="text-sm">{sequences?.length ? t("sequences.manage") : t("sequences.create")}</span>
+					<DropdownMenu.Item onSelect={onCreate} className={`${itemClass} text-blue-700`}>
+						<Plus className="h-4 w-4" />
+						<span className="text-sm font-medium">{sequences?.length ? t("sequences.newSequence") : t("sequences.create")}</span>
 					</DropdownMenu.Item>
+					{!!sequences?.length && (
+						<DropdownMenu.Item asChild className={itemClass}>
+							<Link href="/sequences">
+								<Settings2 className="h-4 w-4 text-neutral-600" />
+								<span className="text-sm">{t("sequences.manage")}</span>
+							</Link>
+						</DropdownMenu.Item>
+					)}
 					{!!sequences?.length && <p className="px-3 pb-1.5 pt-1 text-xs text-neutral-500">{t("sequences.draftStays")}</p>}
 				</DropdownMenu.SubContent>
 			</DropdownMenu.Portal>
@@ -93,7 +122,13 @@ export function SequencesSubmenu({ onPick, onOpenSheet, disabled }: { onPick: (s
 }
 
 /** Bottom sheet listing sequences, for touch screens. */
-export function SequencesSheet({ open, onOpenChange, onPick }: { open: boolean; onOpenChange: (open: boolean) => void; onPick: (sequence: SequenceSummary) => void }) {
+export function SequencesSheet({ open, onOpenChange, onPick, onEdit, onCreate }: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onPick: (sequence: SequenceSummary) => void;
+	onEdit: (sequence: SequenceSummary) => void;
+	onCreate: () => void;
+}) {
 	const { t } = useLanguage();
 	const sequences = useSequenceList(open);
 	return (
@@ -109,21 +144,28 @@ export function SequencesSheet({ open, onOpenChange, onPick }: { open: boolean; 
 				{sequences?.length === 0 && <p className="px-6 py-3 text-sm text-neutral-500">{t("sequences.empty")}</p>}
 				<div role="list">
 					{sequences?.map((sequence) => (
-						<button key={sequence.id} type="button" role="listitem" onClick={() => { onOpenChange(false); onPick(sequence); }} className="flex w-full items-center gap-4 px-6 py-3 text-left hover:bg-neutral-100 active:bg-neutral-200">
-							<ListOrdered className="h-5 w-5 shrink-0 text-neutral-600" aria-hidden />
-							<span className="min-w-0 flex-1">
-								<span className="block truncate text-base text-neutral-900">{sequence.name}</span>
-								<span className="block truncate text-sm text-neutral-500">{followUpSummary(sequence.steps, t)}</span>
-							</span>
-						</button>
+						<div key={sequence.id} role="listitem" className="flex items-center">
+							<button type="button" onClick={() => { onOpenChange(false); onPick(sequence); }} className="flex min-w-0 flex-1 items-center gap-4 py-3 pl-6 text-left hover:bg-neutral-100 active:bg-neutral-200">
+								<ListOrdered className="h-5 w-5 shrink-0 text-neutral-600" aria-hidden />
+								<span className="min-w-0 flex-1">
+									<span className="block truncate text-base text-neutral-900">{sequence.name}</span>
+									<span className="block truncate text-sm text-neutral-500">{followUpSummary(sequence.steps, t)}</span>
+								</span>
+							</button>
+							<button type="button" onClick={() => { onOpenChange(false); onEdit(sequence); }} aria-label={t("sequences.editSequence")} className="mr-3 rounded-full p-2.5 text-neutral-600 active:bg-neutral-200"><Pencil className="h-4.5 w-4.5" /></button>
+						</div>
 					))}
 				</div>
-				<div className="mt-1 border-t border-neutral-200 px-6 pt-3">
-					<Link href={sequences?.length ? "/sequences" : "/sequences/new"} onClick={() => onOpenChange(false)} className="flex items-center gap-4 py-2 text-sm font-medium text-blue-700">
-						<Settings2 className="h-5 w-5" aria-hidden />
-						{sequences?.length ? t("sequences.manage") : t("sequences.create")}
-					</Link>
-					{!!sequences?.length && <p className="pb-1 pt-1 text-xs text-neutral-500">{t("sequences.draftStays")}</p>}
+				<div className="mt-1 border-t border-neutral-200 pt-1">
+					<button type="button" onClick={() => { onOpenChange(false); onCreate(); }} className="flex w-full items-center gap-4 px-6 py-3 text-left text-base font-medium text-blue-700 active:bg-neutral-200">
+						<Plus className="h-5 w-5" aria-hidden />{sequences?.length ? t("sequences.newSequence") : t("sequences.create")}
+					</button>
+					{!!sequences?.length && (
+						<Link href="/sequences" onClick={() => onOpenChange(false)} className="flex items-center gap-4 px-6 py-3 text-base text-neutral-900 active:bg-neutral-200">
+							<Settings2 className="h-5 w-5 text-neutral-600" aria-hidden />{t("sequences.manage")}
+						</Link>
+					)}
+					{!!sequences?.length && <p className="px-6 pb-1 pt-1 text-xs text-neutral-500">{t("sequences.draftStays")}</p>}
 				</div>
 			</DialogContent>
 		</Dialog>
