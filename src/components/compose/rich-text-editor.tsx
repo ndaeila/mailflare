@@ -12,7 +12,6 @@ import {
 	RemoveFormatting,
 	Strikethrough,
 	Underline,
-	X,
 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -51,6 +50,7 @@ export function RichTextEditor({
 	mergeFieldLabel,
 	editorApi,
 	mobileToolbarExtra,
+	phoneToolbarOpen = false,
 }: RichTextEditorProps) {
 	const { t } = useLanguage();
 	const editorRef = useRef<HTMLDivElement | null>(null);
@@ -60,9 +60,6 @@ export function RichTextEditor({
 	const [showQuoted, setShowQuoted] = useState(false);
 	const savedRange = useRef<Range | null>(null);
 	const rootRef = useRef<HTMLDivElement | null>(null);
-	// Phones show the formatting bar only while writing, as the last row of the sheet: the sheet's
-	// content ends where the visible area does, so it sits right above the keyboard and Safari's bars.
-	const [focused, setFocused] = useState(false);
 	const lastRange = useRef<Range | null>(null);
 	const labelRef = useRef(mergeFieldLabel);
 	useLayoutEffect(() => { labelRef.current = mergeFieldLabel; }, [mergeFieldLabel]);
@@ -174,8 +171,6 @@ export function RichTextEditor({
 		<div
 			ref={rootRef}
 			className={cn("flex min-h-0 flex-1 flex-col", className)}
-			onFocus={() => setFocused(true)}
-			onBlur={(event) => { if (!rootRef.current?.contains(event.relatedTarget as Node | null)) setFocused(false); }}
 		>
 			<div className="relative min-h-0 flex-1 overflow-y-auto">
 				<div
@@ -220,7 +215,7 @@ export function RichTextEditor({
 				onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) event.preventDefault(); }}
 				className={cn(
 					"relative flex items-center gap-0.5 border-t border-neutral-100 px-4 py-3",
-					focused && !disabled ? "max-md:flex max-md:gap-0.5 max-md:overflow-x-auto max-md:border-t max-md:border-neutral-200 max-md:bg-white max-md:px-1 max-md:py-1 max-md:[scrollbar-width:none]" : "max-md:hidden",
+					phoneToolbarOpen && !disabled ? "max-md:order-first max-md:flex max-md:gap-0.5 max-md:overflow-x-auto max-md:border-b max-md:border-t-0 max-md:px-1 max-md:py-1 max-md:[scrollbar-width:none]" : "max-md:hidden",
 				)}
 			>
 				<span className="contents max-md:hidden">{toolbarStart}</span>
@@ -268,14 +263,6 @@ export function RichTextEditor({
 					</button>
 				</Tooltip>
 				<span className="contents max-md:hidden">{toolbarEnd}</span>
-				<button
-					type="button"
-					aria-label={t("editor.hideFormatting")}
-					onClick={() => { setFocused(false); (document.activeElement as HTMLElement | null)?.blur(); }}
-					className="sticky right-0 ml-auto shrink-0 rounded-full bg-neutral-100 p-2.5 text-neutral-800 shadow-[-10px_0_8px_-2px_var(--color-white)] md:hidden"
-				>
-					<X className="h-5 w-5" />
-				</button>
 				{linkOpen && (
 					<form
 						className="absolute bottom-full left-2 z-10 mb-1 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg"

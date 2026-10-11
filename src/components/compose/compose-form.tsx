@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { ChevronDown, ChevronUp, Ellipsis, FileText, Forward, Maximize2, Minimize2, Minus, Paperclip, Reply, SendHorizontal, Trash2, Undo2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Ellipsis, FileText, Forward, Maximize2, Minimize2, Minus, Paperclip, Reply, SendHorizontal, Trash2, Type, Undo2, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ScheduleSendDialog } from "./schedule-send-dialog";
 import { formatScheduledSendTime } from "@/components/messages/scheduled-send-utils";
@@ -43,7 +43,9 @@ import { SequencesSheet, SequencesSubmenu } from "@/components/sequences/sequenc
 import { InsertFieldMenu, SequenceEmailEditor } from "@/components/sequences/sequence-email-editor";
 import { MergeFieldInput } from "@/components/sequences/merge-field-input";
 import { TemplatesSheet } from "./templates-sheet";
-import { phoneSheetStyle, useVisibleViewportBox } from "./use-keyboard-inset";
+import { usePhoneScrollLock, usePhoneSheetPosition } from "./use-keyboard-inset";
+import { handOffPhoneKeyboard } from "./phone-keyboard-utils";
+import { useIsMobile } from "@/components/sidebar-mobile-utils";
 import { TemplateEditorWindow } from "./template-editor";
 import type { ComposeTemplate } from "./template-types";
 import type { RichTextEditorApi } from "./rich-text-editor-types";
@@ -113,14 +115,19 @@ export function ComposeForm({
 	const [templatesSheetOpen, setTemplatesSheetOpen] = useState(false);
 	const [templateEditor, setTemplateEditor] = useState<{ template?: ComposeTemplate; initial?: { subject: string; html: string } } | null>(null);
 	const editorApi = useRef<RichTextEditorApi | null>(null);
-	const phoneBox = useVisibleViewportBox();
+	const isPhone = useIsMobile();
 	// The floating composer is a Gmail-style sheet on phones: it slides up, the page behind shrinks
 	// back into a card, and it can be swiped down to close.
-	const phoneSheet = mode === "popup" && !!phoneBox;
+	const phoneSheet = mode === "popup" && isPhone;
+	const sheetCoverRef = useRef<HTMLDivElement | null>(null);
+	// Phones: the formatting row is opened from the Aa button instead of following focus.
+	const [formatOpen, setFormatOpen] = useState(false);
 	const [closing, setClosing] = useState(false);
 	const [dragY, setDragY] = useState(0);
 	const dragStart = useRef<number | null>(null);
 	const formRef = useRef<HTMLFormElement>(null);
+	usePhoneSheetPosition(formRef, sheetCoverRef, isPhone && !minimized);
+	usePhoneScrollLock(isPhone && !minimized);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const pendingSave = useRef<(() => Promise<void>) | null>(null);
 	const draftGeneration = useRef(0);
@@ -685,7 +692,9 @@ export function ComposeForm({
 			: "relative flex h-full min-h-[720px] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm";
 	// Phones always get Gmail's stacked-card sheet, whichever way the composer was opened. It runs to
 	// the bottom of the screen (white under the keyboard and Safari's bars) below a small gap.
-	const mobileFrameClass = "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-5 max-md:z-50 max-md:h-auto max-md:min-h-0 max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:rounded-b-none max-md:rounded-t-[14px] max-md:border-0 max-md:shadow-none";
+	// The large downward shadow paints the sheet's colour below its edge, so wherever Safari's
+	// keyboard bars end up there is never a gap of page or black under the sheet.
+	const mobileFrameClass = "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-5 max-md:z-50 max-md:h-auto max-md:min-h-0 max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:rounded-b-none max-md:rounded-t-[14px] max-md:border-0 max-md:shadow-[0_70vh_0_0_var(--color-white)]";
 
 	function closeComposer() {
 		if (!onClose) { router.push("/inbox"); return; }
@@ -701,6 +710,14 @@ export function ComposeForm({
 		document.body.classList.add("mf-sheet-open");
 		return () => document.body.classList.remove("mf-sheet-open");
 	}, [phoneSheet, minimized]);
+
+	// Phones: focus To once the sheet has landed, not while it is still below the screen (which
+	// makes Safari pan the page). The tap that opened the sheet already raised the keyboard.
+	useEffect(() => {
+		if (!isPhone || draftIdToLoad) return;
+		const timer = window.setTimeout(() => handOffPhoneKeyboard(document.getElementById(`${mode}-to`)), 380);
+		return () => window.clearTimeout(timer);
+	}, [isPhone, draftIdToLoad, mode]);
 
 	const sheetDrag = phoneSheet ? {
 		onTouchStart: (event: React.TouchEvent) => { dragStart.current = event.touches[0].clientY; },
@@ -764,7 +781,8 @@ export function ComposeForm({
 					{toast.message}
 				</div>
 			)}
-			<form onSubmit={onSubmit} className={cn(frameClass, mobileFrameClass, phoneSheet && "mf-sheet", closing && "mf-sheet-closing")} style={{ ...phoneSheetStyle(phoneBox), ...(dragY ? { transform: `translateY(${dragY}px)`, transition: "none" } : {}) }} ref={formRef} role={modalMode && !minimized ? "dialog" : mode === "popup" ? "region" : undefined} aria-modal={modalMode && !minimized || undefined} aria-label={mode === "popup" ? t("compose.dialogLabel") : undefined} onKeyDown={(event) => { if (modalMode && !minimized && event.key === "Escape") { event.preventDefault(); setModalMode(false); } }} onDragEnterCapture={minimized ? undefined : onFileDragEnter} onDragOverCapture={minimized ? undefined : onFileDragOver} onDragLeaveCapture={minimized ? undefined : onFileDragLeave} onDropCapture={minimized ? undefined : onFileDrop}>
+			{isPhone && !minimized && <div ref={sheetCoverRef} className="fixed inset-x-0 z-50 hidden bg-black md:hidden" aria-hidden="true" />}
+			<form onSubmit={onSubmit} className={cn(frameClass, mobileFrameClass, phoneSheet && "mf-sheet", closing && "mf-sheet-closing")} style={dragY ? { transform: `translateY(${dragY}px)`, transition: "none" } : undefined} ref={formRef} role={modalMode && !minimized ? "dialog" : mode === "popup" ? "region" : undefined} aria-modal={modalMode && !minimized || undefined} aria-label={mode === "popup" ? t("compose.dialogLabel") : undefined} onKeyDown={(event) => { if (modalMode && !minimized && event.key === "Escape") { event.preventDefault(); setModalMode(false); } }} onDragEnterCapture={minimized ? undefined : onFileDragEnter} onDragOverCapture={minimized ? undefined : onFileDragOver} onDragLeaveCapture={minimized ? undefined : onFileDragLeave} onDropCapture={minimized ? undefined : onFileDrop}>
 				{sequence && editingStep !== null && sequenceSteps[editingStep] && (
 					<div ref={(element) => element?.scrollIntoView({ block: "nearest" })} className="absolute inset-0 z-30" onKeyDown={(event) => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
 						<SequenceEmailEditor
@@ -788,6 +806,16 @@ export function ComposeForm({
 				<div className="flex h-14 shrink-0 touch-none items-center gap-1 px-2 md:hidden" {...sheetDrag}>
 					<button type="button" onClick={closeComposer} aria-label={t("compose.close")} className="rounded-full bg-neutral-100 p-2 text-neutral-700"><X className="h-5 w-5" /></button>
 					<span className="flex-1" />
+					<button
+						type="button"
+						aria-label={t("editor.formatting")}
+						aria-pressed={formatOpen}
+						onPointerDown={(event) => event.preventDefault()}
+						onClick={() => setFormatOpen((open) => !open)}
+						className={cn("rounded-full p-2.5 text-neutral-800", formatOpen && "bg-blue-100 text-blue-900")}
+					>
+						<Type className="h-5.5 w-5.5" />
+					</button>
 					<button type="button" onClick={() => attachmentInput.current?.click()} disabled={loading || loadingDraft} aria-label={t("compose.attachFiles")} className="rounded-full p-2.5 text-neutral-800 disabled:opacity-40"><Paperclip className="h-5.5 w-5.5" /></button>
 					<button
 						type="submit"
@@ -907,7 +935,7 @@ export function ComposeForm({
 					onChange={setTo}
 					placeholder={t("compose.toPlaceholder")}
 					required
-					autoFocus={!draftIdToLoad}
+					autoFocus={!draftIdToLoad && !isPhone}
 					disabled={loadingDraft}
 					trailing={
 						<>
@@ -975,6 +1003,7 @@ export function ComposeForm({
 					placeholder={t("compose.bodyPlaceholder")}
 					mergeFieldLabel={sequence ? (name) => fieldLabel(name, t) : undefined}
 					editorApi={editorApi}
+					phoneToolbarOpen={formatOpen}
 					mobileToolbarExtra={sequence ? <InsertFieldMenu fields={sequence.variables} onInsert={(name) => editorApi.current?.insertField(name)} /> : undefined}
 					footerContent={<>
 						{sequence && (

@@ -514,6 +514,13 @@ button {
 	html:has(body.mf-sheet-open),
 	body.mf-sheet-open {
 		background: #000;
+		overflow: hidden;
+		overscroll-behavior: none;
+	}
+	/* A scroller inside a sheet that reaches its end must not hand the drag on to the page. */
+	.mf-sheet,
+	.mf-sheet * {
+		overscroll-behavior: contain;
 	}
 	body.mf-sheet-open .mf-app-root {
 		transform: translateY(8px) scale(0.93);
