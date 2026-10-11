@@ -44,7 +44,7 @@ import { InsertFieldMenu, SequenceEmailEditor } from "@/components/sequences/seq
 import { MergeFieldInput } from "@/components/sequences/merge-field-input";
 import { TemplatesSheet } from "./templates-sheet";
 import { usePhoneScrollLock, usePhoneSheetPosition } from "./use-keyboard-inset";
-import { handOffPhoneKeyboard } from "./phone-keyboard-utils";
+import { focusEditableEnd, handOffPhoneKeyboard } from "./phone-keyboard-utils";
 import { useIsMobile } from "@/components/sidebar-mobile-utils";
 import { TemplateEditorWindow } from "./template-editor";
 import type { ComposeTemplate } from "./template-types";
@@ -119,14 +119,13 @@ export function ComposeForm({
 	// The floating composer is a Gmail-style sheet on phones: it slides up, the page behind shrinks
 	// back into a card, and it can be swiped down to close.
 	const phoneSheet = mode === "popup" && isPhone;
-	const sheetCoverRef = useRef<HTMLDivElement | null>(null);
 	// Phones: the formatting row is opened from the Aa button instead of following focus.
 	const [formatOpen, setFormatOpen] = useState(false);
 	const [closing, setClosing] = useState(false);
 	const [dragY, setDragY] = useState(0);
 	const dragStart = useRef<number | null>(null);
 	const formRef = useRef<HTMLFormElement>(null);
-	usePhoneSheetPosition(formRef, sheetCoverRef, isPhone && !minimized);
+	usePhoneSheetPosition(formRef, null, isPhone && !minimized);
 	usePhoneScrollLock(isPhone && !minimized);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const pendingSave = useRef<(() => Promise<void>) | null>(null);
@@ -781,7 +780,6 @@ export function ComposeForm({
 					{toast.message}
 				</div>
 			)}
-			{isPhone && !minimized && <div ref={sheetCoverRef} className="fixed inset-x-0 z-50 hidden bg-black md:hidden" aria-hidden="true" />}
 			<form onSubmit={onSubmit} className={cn(frameClass, mobileFrameClass, phoneSheet && "mf-sheet", closing && "mf-sheet-closing")} style={dragY ? { transform: `translateY(${dragY}px)`, transition: "none" } : undefined} ref={formRef} role={modalMode && !minimized ? "dialog" : mode === "popup" ? "region" : undefined} aria-modal={modalMode && !minimized || undefined} aria-label={mode === "popup" ? t("compose.dialogLabel") : undefined} onKeyDown={(event) => { if (modalMode && !minimized && event.key === "Escape") { event.preventDefault(); setModalMode(false); } }} onDragEnterCapture={minimized ? undefined : onFileDragEnter} onDragOverCapture={minimized ? undefined : onFileDragOver} onDragLeaveCapture={minimized ? undefined : onFileDragLeave} onDropCapture={minimized ? undefined : onFileDrop}>
 				{sequence && editingStep !== null && sequenceSteps[editingStep] && (
 					<div ref={(element) => element?.scrollIntoView({ block: "nearest" })} className="absolute inset-0 z-30" onKeyDown={(event) => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
@@ -810,8 +808,13 @@ export function ComposeForm({
 						type="button"
 						aria-label={t("editor.formatting")}
 						aria-pressed={formatOpen}
-						onPointerDown={(event) => event.preventDefault()}
-						onClick={() => setFormatOpen((open) => !open)}
+						onMouseDown={(event) => event.preventDefault()}
+						onClick={() => {
+							// Formatting applies to the message, so opening it moves the caret there and keeps the keyboard up.
+							const editor = formRef.current?.querySelector<HTMLElement>("[contenteditable='true']");
+							if (!formatOpen && editor && !editor.contains(document.activeElement)) focusEditableEnd(editor);
+							setFormatOpen((open) => !open);
+						}}
 						className={cn("rounded-full p-2.5 text-neutral-800", formatOpen && "bg-blue-100 text-blue-900")}
 					>
 						<Type className="h-5.5 w-5.5" />

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { RichTextEditor } from "./rich-text-editor";
 import { usePhoneScrollLock, usePhoneSheetPosition } from "./use-keyboard-inset";
+import { focusEditableEnd } from "./phone-keyboard-utils";
 import type { RichTextEditorApi } from "./rich-text-editor-types";
 
 /** Header row styling shared with the composer's From/To rows. */
@@ -43,8 +44,9 @@ export function EditorShell({ id, title, subtitle, onCancel, onDone, doneLabel, 
 	const { t } = useLanguage();
 	const label = doneLabel ?? t("sequences.done");
 	const [formatOpen, setFormatOpen] = useState(false);
+	const shellRef = useRef<HTMLDivElement | null>(null);
 	return (
-		<div className="flex h-full min-h-0 flex-col bg-white" onKeyDown={(event) => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
+		<div ref={shellRef} className="flex h-full min-h-0 flex-col bg-white" onKeyDown={(event) => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
 			<div className="flex h-9 shrink-0 items-center gap-2 bg-neutral-800 px-2 text-sm font-medium text-white dark:bg-neutral-100 max-md:hidden">
 				<button type="button" onClick={onCancel} aria-label={t("sequences.back")} className="rounded p-1 text-neutral-300 hover:bg-neutral-700 hover:text-white dark:text-neutral-600 dark:hover:bg-neutral-200"><ArrowLeft className="h-4 w-4" /></button>
 				<span className="min-w-0 flex-1 truncate dark:text-neutral-900">
@@ -62,8 +64,12 @@ export function EditorShell({ id, title, subtitle, onCancel, onDone, doneLabel, 
 					type="button"
 					aria-label={t("editor.formatting")}
 					aria-pressed={formatOpen}
-					onPointerDown={(event) => event.preventDefault()}
-					onClick={() => setFormatOpen((open) => !open)}
+					onMouseDown={(event) => event.preventDefault()}
+					onClick={() => {
+						const editor = shellRef.current?.querySelector<HTMLElement>("[contenteditable='true']");
+						if (!formatOpen && editor && !editor.contains(document.activeElement)) focusEditableEnd(editor);
+						setFormatOpen((open) => !open);
+					}}
 					className={cn("rounded-full p-2.5 text-neutral-800", formatOpen && "bg-blue-100 text-blue-900")}
 				>
 					<Type className="h-5 w-5" />
