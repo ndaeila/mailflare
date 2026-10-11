@@ -500,6 +500,8 @@
 	"apiKeys.mcpOrganize.description": "メールを既読にしたり移動したりします。",
 	"apiKeys.mcpRequestSend.label": "送信確認のリクエスト",
 	"apiKeys.mcpRequestSend.description": "Mailflare で確認が必要な送信を提案します。",
+	"apiKeys.mcpSend.label": "確認なしで送信",
+	"apiKeys.mcpSend.description": "Mailflare での確認なしで、メールをすぐに送信します。",
 	"apiKeys.mcpCalendarRead.label": "カレンダーの読み取り",
 	"apiKeys.mcpCalendarRead.description": "予定と空き時間の一覧表示、検索、確認を行います。",
 	"apiKeys.mcpCalendarWrite.label": "カレンダーの管理",

@@ -525,6 +525,8 @@
 	"apiKeys.mcpOrganize.description": "تحديد الرسائل كمقروءة ونقلها.",
 	"apiKeys.mcpRequestSend.label": "طلب مراجعة الإرسال",
 	"apiKeys.mcpRequestSend.description": "اقترح إرسالًا يجب أن تؤكده في Mailflare.",
+	"apiKeys.mcpSend.label": "إرسال دون مراجعة",
+	"apiKeys.mcpSend.description": "إرسال البريد فورًا دون خطوة تأكيد في Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "قراءة التقويم",
 	"apiKeys.mcpCalendarRead.description": "عرض الأحداث والوقت الحر والبحث فيها وفحصها.",
 	"apiKeys.mcpCalendarWrite.label": "إدارة التقويم",

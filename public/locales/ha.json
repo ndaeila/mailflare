@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "Yi wa saƙonni alama an karanta kuma ka mayar da su.",
 	"apiKeys.mcpRequestSend.label": "Nemi duba aikawa",
 	"apiKeys.mcpRequestSend.description": "Ba da shawarar aikawa da dole ka tabbatar a Mailflare.",
+	"apiKeys.mcpSend.label": "Aika ba tare da dubawa ba",
+	"apiKeys.mcpSend.description": "Aika imel nan take, ba tare da matakin tabbatarwa a Mailflare ba.",
 	"apiKeys.mcpCalendarRead.label": "Karanta kalanda",
 	"apiKeys.mcpCalendarRead.description": "Jera, nema da duba abubuwan da za su faru da lokacin hutu.",
 	"apiKeys.mcpCalendarWrite.label": "Sarrafa kalanda",

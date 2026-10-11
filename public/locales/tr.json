@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "İletileri okundu olarak işaretleyin ve taşıyın.",
 	"apiKeys.mcpRequestSend.label": "Gönderim incelemesi iste",
 	"apiKeys.mcpRequestSend.description": "Mailflare'de onaylamanız gereken bir gönderim önerin.",
+	"apiKeys.mcpSend.label": "İncelemeden gönder",
+	"apiKeys.mcpSend.description": "E-postayı Mailflare'de onay adımı olmadan hemen gönder.",
 	"apiKeys.mcpCalendarRead.label": "Takvimi oku",
 	"apiKeys.mcpCalendarRead.description": "Etkinlikleri ve boş zamanı listeleyin, arayın ve inceleyin.",
 	"apiKeys.mcpCalendarWrite.label": "Takvimi yönet",

@@ -503,6 +503,8 @@
 	"apiKeys.mcpOrganize.description": "پیغامات کو پڑھا ہوا نشان زد کریں اور منتقل کریں۔",
 	"apiKeys.mcpRequestSend.label": "ارسال کے جائزے کی درخواست کریں",
 	"apiKeys.mcpRequestSend.description": "ایسا ارسال تجویز کریں جس کی تصدیق آپ کو Mailflare میں کرنی ہوگی۔",
+	"apiKeys.mcpSend.label": "جائزے کے بغیر بھیجیں",
+	"apiKeys.mcpSend.description": "Mailflare میں تصدیق کے بغیر فوراً ای میل بھیجیں۔",
 	"apiKeys.mcpCalendarRead.label": "کیلنڈر پڑھیں",
 	"apiKeys.mcpCalendarRead.description": "تقریبات اور خالی وقت کی فہرست دیکھیں، تلاش کریں اور جانچیں۔",
 	"apiKeys.mcpCalendarWrite.label": "کیلنڈر سنبھالیں",

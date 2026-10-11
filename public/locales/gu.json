@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "સંદેશાને વાંચેલા તરીકે ચિહ્નિત કરો અને ખસેડો.",
 	"apiKeys.mcpRequestSend.label": "મોકલવાની સમીક્ષાની વિનંતી કરો",
 	"apiKeys.mcpRequestSend.description": "એવી મોકલણી સૂચવો જેની તમારે Mailflare માં પુષ્ટિ કરવી પડશે.",
+	"apiKeys.mcpSend.label": "સમીક્ષા વિના મોકલો",
+	"apiKeys.mcpSend.description": "Mailflare માં પુષ્ટિના પગલા વિના તરત ઇમેઇલ મોકલો.",
 	"apiKeys.mcpCalendarRead.label": "કૅલેન્ડર વાંચો",
 	"apiKeys.mcpCalendarRead.description": "ઇવેન્ટ અને ખાલી સમયની સૂચિ બનાવો, શોધો અને તપાસો.",
 	"apiKeys.mcpCalendarWrite.label": "કૅલેન્ડર સંચાલિત કરો",

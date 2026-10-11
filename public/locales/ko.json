@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "메시지를 읽음으로 표시하고 이동합니다.",
 	"apiKeys.mcpRequestSend.label": "발송 검토 요청",
 	"apiKeys.mcpRequestSend.description": "Mailflare에서 직접 확인해야 하는 발송을 제안합니다.",
+	"apiKeys.mcpSend.label": "검토 없이 보내기",
+	"apiKeys.mcpSend.description": "Mailflare에서 확인 단계 없이 이메일을 바로 보냅니다.",
 	"apiKeys.mcpCalendarRead.label": "캘린더 읽기",
 	"apiKeys.mcpCalendarRead.description": "일정과 빈 시간을 목록 조회, 검색, 확인합니다.",
 	"apiKeys.mcpCalendarWrite.label": "캘린더 관리",

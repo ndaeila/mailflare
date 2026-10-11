@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "Berichten als gelezen markeren en verplaatsen.",
 	"apiKeys.mcpRequestSend.label": "Beoordeling van verzending aanvragen",
 	"apiKeys.mcpRequestSend.description": "Stel een verzending voor die je in Mailflare moet bevestigen.",
+	"apiKeys.mcpSend.label": "Verzenden zonder controle",
+	"apiKeys.mcpSend.description": "E-mail direct verzenden, zonder bevestiging in Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "Agenda lezen",
 	"apiKeys.mcpCalendarRead.description": "Afspraken en vrije tijd weergeven, zoeken en bekijken.",
 	"apiKeys.mcpCalendarWrite.label": "Agenda beheren",

@@ -510,6 +510,8 @@
 	"apiKeys.mcpOrganize.description": "Отметка сообщений прочитанными и их перемещение.",
 	"apiKeys.mcpRequestSend.label": "Запрос проверки отправки",
 	"apiKeys.mcpRequestSend.description": "Предложить отправку, которую вы должны подтвердить в Mailflare.",
+	"apiKeys.mcpSend.label": "Отправлять без проверки",
+	"apiKeys.mcpSend.description": "Отправлять письма сразу, без подтверждения в Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "Чтение календаря",
 	"apiKeys.mcpCalendarRead.description": "Просмотр списка, поиск и просмотр событий и свободного времени.",
 	"apiKeys.mcpCalendarWrite.label": "Управление календарём",

@@ -505,6 +505,8 @@
 	"apiKeys.mcpOrganize.description": "Weka alama jumbe kuwa zimesomwa na uzihamishe.",
 	"apiKeys.mcpRequestSend.label": "Omba mapitio ya kutuma",
 	"apiKeys.mcpRequestSend.description": "Pendekeza kutuma ambako lazima uthibitishe ndani ya Mailflare.",
+	"apiKeys.mcpSend.label": "Tuma bila ukaguzi",
+	"apiKeys.mcpSend.description": "Tuma barua pepe mara moja, bila hatua ya kuthibitisha katika Mailflare.",
 	"apiKeys.mcpCalendarRead.label": "Soma kalenda",
 	"apiKeys.mcpCalendarRead.description": "Orodhesha, tafuta na kagua matukio na muda wa bure.",
 	"apiKeys.mcpCalendarWrite.label": "Simamia kalenda",
