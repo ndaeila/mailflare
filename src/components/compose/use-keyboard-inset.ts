@@ -4,18 +4,30 @@ import { useEffect, useState } from "react";
 
 const PHONE_QUERY = "(max-width: 767px)";
 
+export type VisibleViewportBox = {
+	/** Distance Safari has scrolled the visible area down from the top of the layout viewport. */
+	top: number;
+	height: number;
+	/** How much of the layout viewport's bottom is covered (keyboard and its bars). */
+	bottomInset: number;
+};
+
 /**
- * On phones, the box of the screen that is actually visible: above the keyboard and wherever
- * Safari has scrolled to. A full-screen composer pinned to this box keeps its top bar in view
- * while typing, instead of being pushed up off the screen. Undefined on larger screens.
+ * On phones, the part of the screen that is actually visible: above the keyboard and wherever
+ * Safari has scrolled to. Undefined on larger screens.
  */
-export function useVisibleViewportBox(): { top: number; height: number } | undefined {
-	const [box, setBox] = useState<{ top: number; height: number } | undefined>(undefined);
+export function useVisibleViewportBox(): VisibleViewportBox | undefined {
+	const [box, setBox] = useState<VisibleViewportBox | undefined>(undefined);
 	useEffect(() => {
 		const viewport = window.visualViewport;
 		const query = window.matchMedia(PHONE_QUERY);
 		if (!viewport) return;
-		const update = () => setBox(query.matches ? { top: Math.round(viewport.offsetTop), height: Math.round(viewport.height) } : undefined);
+		const update = () => {
+			if (!query.matches) { setBox(undefined); return; }
+			const top = Math.round(viewport.offsetTop);
+			const height = Math.round(viewport.height);
+			setBox({ top, height, bottomInset: Math.max(0, Math.round(window.innerHeight - top - height)) });
+		};
 		update();
 		viewport.addEventListener("resize", update);
 		viewport.addEventListener("scroll", update);
@@ -29,10 +41,13 @@ export function useVisibleViewportBox(): { top: number; height: number } | undef
 	return box;
 }
 
-/** Gap above a phone sheet, so the page behind peeks out like iOS stacked cards (Gmail's compose). */
-export const PHONE_SHEET_GAP = 12;
+/** Gap above a phone sheet where the page behind, shrunk back like an iOS card, peeks out. */
+export const PHONE_SHEET_GAP = 20;
 
-/** Style that pins a phone sheet to the visible box, leaving the stacked-card gap at the top. */
-export function phoneSheetStyle(box: { top: number; height: number } | undefined): React.CSSProperties | undefined {
-	return box ? { top: box.top + PHONE_SHEET_GAP, height: box.height - PHONE_SHEET_GAP } : undefined;
+/**
+ * A phone sheet runs to the bottom of the screen, so its white continues under the keyboard and
+ * Safari's bars; its content is padded to end where the visible area does.
+ */
+export function phoneSheetStyle(box: VisibleViewportBox | undefined): React.CSSProperties | undefined {
+	return box ? { top: box.top + PHONE_SHEET_GAP, paddingBottom: box.bottomInset } : undefined;
 }

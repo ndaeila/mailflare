@@ -87,7 +87,7 @@ export function EditorWindow({ open, onOpenChange, title, children }: { open: bo
 				closeClassName="hidden"
 				onOpenAutoFocus={(event) => event.preventDefault()}
 				style={phoneSheetStyle(phoneBox)}
-				className="h-[86vh] w-[min(860px,calc(100vw-32px))] overflow-hidden rounded-lg p-0 max-md:inset-x-0 max-md:bottom-0 max-md:top-3 max-md:h-auto max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-[20px]"
+				className="mf-sheet h-[86vh] w-[min(860px,calc(100vw-32px))] overflow-hidden rounded-lg p-0 max-md:inset-x-0 max-md:bottom-0 max-md:top-5 max-md:h-auto max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-[14px]"
 			>
 				<DialogTitle className="sr-only">{title}</DialogTitle>
 				{open && children}

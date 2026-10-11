@@ -24,7 +24,7 @@ export function TemplatesSheet({ open, onOpenChange, onApply, onEdit, onNew, onS
 			<DialogContent
 				closeClassName="hidden"
 				onOpenAutoFocus={(event) => event.preventDefault()}
-				className="bottom-0 top-auto max-h-[80dvh] w-full max-w-none translate-y-0 overflow-y-auto rounded-b-none rounded-t-[28px] px-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 sm:bottom-auto sm:top-1/2 sm:w-[min(420px,calc(100vw-32px))] sm:-translate-y-1/2 sm:rounded-[28px]"
+				className="mf-sheet bottom-0 top-auto max-h-[80dvh] w-full max-w-none translate-y-0 overflow-y-auto rounded-b-none rounded-t-[28px] px-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 sm:bottom-auto sm:top-1/2 sm:w-[min(420px,calc(100vw-32px))] sm:-translate-y-1/2 sm:rounded-[28px]"
 			>
 				<div className="mx-auto mb-2 h-1 w-8 rounded-full bg-neutral-300 sm:hidden" aria-hidden />
 				<DialogTitle className="px-6 pb-2 pt-2 text-xl font-normal">{t("template.templates")}</DialogTitle>
