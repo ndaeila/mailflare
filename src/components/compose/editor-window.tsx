@@ -5,6 +5,7 @@ import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { RichTextEditor } from "./rich-text-editor";
+import { phoneSheetStyle, useVisibleViewportBox } from "./use-keyboard-inset";
 import type { RichTextEditorApi } from "./rich-text-editor-types";
 
 /** Header row styling shared with the composer's From/To rows. */
@@ -79,12 +80,14 @@ export function EditorShell({ id, title, subtitle, onCancel, onDone, doneLabel, 
 
 /** EditorShell in a compose-sized window: centered like the composer's expanded mode, full screen on phones. */
 export function EditorWindow({ open, onOpenChange, title, children }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; children: React.ReactNode }) {
+	const phoneBox = useVisibleViewportBox();
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent
 				closeClassName="hidden"
 				onOpenAutoFocus={(event) => event.preventDefault()}
-				className="h-[86vh] w-[min(860px,calc(100vw-32px))] overflow-hidden rounded-lg p-0 max-md:inset-0 max-md:h-dvh max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none"
+				style={phoneSheetStyle(phoneBox)}
+				className="h-[86vh] w-[min(860px,calc(100vw-32px))] overflow-hidden rounded-lg p-0 max-md:inset-x-0 max-md:bottom-0 max-md:top-3 max-md:h-auto max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-[20px]"
 			>
 				<DialogTitle className="sr-only">{title}</DialogTitle>
 				{open && children}
