@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { LanguageProvider } from "@/components/language-provider";
@@ -7,6 +8,7 @@ import { getRequestLocale, loadServerMessages } from "@/lib/i18n/server";
 import { sidebarBootstrapScript } from "@/components/sidebar-state-utils";
 import { themeBootstrapScript } from "@/components/theme-utils";
 import { getHomeBranding } from "./home-server-utils";
+import { viewportForUserAgent } from "./viewport-utils";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -45,6 +47,10 @@ export async function generateMetadata(): Promise<Metadata> {
 			},
 		},
 	};
+}
+
+export async function generateViewport(): Promise<Viewport> {
+	return viewportForUserAgent((await headers()).get("user-agent"));
 }
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
