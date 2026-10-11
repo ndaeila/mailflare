@@ -1,6 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { messages, outboundJobs } from "@/db/schema";
+import { buildNoReplyCondition } from "@/lib/email/send-conditions";
+import type { SendConditionType } from "@/lib/email/send-conditions-types";
 import { newId } from "@/lib/ids";
 import { buildSnippet } from "@/lib/email/parse";
 import { dispatchWebhooks } from "@/lib/email/webhooks";
@@ -36,6 +38,10 @@ export type SendEmailInput = {
 	attachments?: AttachmentContent[];
 	/** Future delivery time. Values at or before the current time send immediately. */
 	scheduledAt?: string | Date;
+	/** Only for scheduled sends: "no_reply" skips the send if a recipient replies first. */
+	condition?: SendConditionType | null;
+	/** Set when this email is a step of a sequence enrollment (lib/sequences). */
+	sequenceStep?: { enrollmentId: string; position: number };
 	publicOrigin?: string;
 };
 
@@ -156,6 +162,9 @@ export async function sendEmail(
 			attachments: attachments.map(({ content: _content, ...attachment }) => attachment),
 		}),
 		scheduledAt,
+		sendCondition: scheduledAt && input.condition === "no_reply"
+			? JSON.stringify(buildNoReplyCondition({ threadId: input.threadId ?? null, to, cc }))
+			: null,
 	});
 
 	const delivery: PreparedDelivery = {
@@ -248,6 +257,10 @@ async function deliverEmail(env: CloudflareEnv, delivery: PreparedDelivery): Pro
 			metadata: { to: toAddr, cc: cc.length ? joinEmailAddressList(cc) : undefined, subject: input.subject },
 		});
 	} catch (err) {
+		if (input.sequenceStep) {
+			const { onSequenceStepFailed } = await import("@/lib/sequences/service");
+			await onSequenceStepFailed(env, input.sequenceStep).catch(() => undefined);
+		}
 		const error = err instanceof Error ? err.message : "Send failed";
 		await db.update(messages).set({ status: "failed" }).where(eq(messages.id, messageId));
 		await db
@@ -256,6 +269,12 @@ async function deliverEmail(env: CloudflareEnv, delivery: PreparedDelivery): Pro
 			.where(eq(outboundJobs.id, jobId));
 		await dispatchWebhooks(env, input.userId, "message.failed", { messageId, error });
 		throw err;
+	}
+	if (input.sequenceStep) {
+		// Imported lazily: the sequence runner itself sends through this module.
+		const { onSequenceStepSent } = await import("@/lib/sequences/service");
+		try { await onSequenceStepSent(env, { ...input.sequenceStep, messageId }); }
+		catch (error) { console.error("sequence advance failed", input.sequenceStep.enrollmentId, error); }
 	}
 }
 
@@ -325,6 +344,14 @@ export async function processOutboundQueue(
 		await enqueueScheduledDelivery(env, delivery, scheduledAt);
 		return;
 	}
+	// Claim the job before delivering. Cancelling deletes only a job that is still
+	// "queued", so exactly one of cancel and delivery wins.
+	const claimed = await db
+		.update(outboundJobs)
+		.set({ status: "sending", updatedAt: new Date() })
+		.where(and(eq(outboundJobs.id, payload.jobId), eq(outboundJobs.status, "queued")))
+		.returning({ id: outboundJobs.id });
+	if (!claimed.length) return;
 	delivery.attachments = await loadMessageAttachmentContents(env, payload.messageId);
 	await deliverEmail(env, delivery);
 }

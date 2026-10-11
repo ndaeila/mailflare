@@ -18,7 +18,9 @@ import {
   ShieldAlert,
   Star,
   Trash2,
+  ListOrdered,
 } from "lucide-react";
+import { ScheduledSendIcon } from "@/components/icons/scheduled-send-icon";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,6 +63,8 @@ const links = [
   { href: "/starred", labelKey: "navigation.starred", icon: Star, preloadMessages: true },
   { href: "/snoozed", labelKey: "navigation.snoozed", icon: Clock, preloadMessages: true },
   { href: "/sent", labelKey: "navigation.sent", icon: Send, preloadMessages: true },
+  { href: "/scheduled", labelKey: "navigation.scheduled", icon: ScheduledSendIcon, preloadMessages: true },
+  { href: "/sequences", labelKey: "navigation.sequences", icon: ListOrdered },
   { href: "/drafts", labelKey: "navigation.drafts", icon: FileText, preloadMessages: true },
   {
     href: "/archived",
@@ -108,7 +112,7 @@ export function DashboardNav({ className }: { className?: string }) {
     useState<FolderColor>(DEFAULT_FOLDER_COLOR);
   const [addingFolder, setAddingFolder] = useState(false);
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
-  const linksWithCounts: NavLink[] = links.map(({ labelKey, ...rest }): NavLink => {
+  const linksWithCounts: NavLink[] = links.filter((link) => link.href !== "/scheduled" || counts.folders.scheduled.total > 0).map(({ labelKey, ...rest }): NavLink => {
     const link = { ...rest, label: t(labelKey) };
     if (link.href === "/inbox") {
       return { ...link, count: getFolderNavCount("inbox", counts.folders) };
@@ -121,6 +125,9 @@ export function DashboardNav({ className }: { className?: string }) {
     }
     if (link.href === "/sent") {
       return { ...link, count: getFolderNavCount("sent", counts.folders) };
+    }
+    if (link.href === "/scheduled") {
+      return { ...link, count: counts.folders.scheduled.total };
     }
     if (link.href === "/drafts") {
       return { ...link, count: getFolderNavCount("drafts", counts.folders) };

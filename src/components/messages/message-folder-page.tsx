@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent } from "react";
-import { Archive, ChevronLeft, ChevronRight, ListFilter, Mail, MailOpen, Trash2 } from "lucide-react";
+import { Archive, ChevronLeft, ChevronRight, ListFilter, ListOrdered, Mail, MailOpen, Trash2, Undo2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,6 +11,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useMailSearch } from "@/components/mail-search/mail-search-context";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
 import { usePageLoading } from "@/components/page-loading";
+import { formatScheduledSendTime } from "./scheduled-send-utils";
 import { useIsMobile } from "@/components/sidebar-mobile-utils";
 import { useMessageCounts } from "@/hooks/use-message-counts";
 import { useMessages } from "@/hooks/use-messages";
@@ -117,9 +118,10 @@ function MessageListRow({
 		navigation.onNavigate(event, !read);
 	}
 
-	if (compact && config.folder !== "drafts") {
+	if (compact) {
 		const compactRow = (
 			<div
+				role={swipeable ? undefined : "listitem"}
 				className={`group grid grid-cols-[20px_minmax(0,1fr)] gap-3 border-l-2 px-4 py-3 transition-colors ${active
 					? "border-l-blue-600 bg-blue-50"
 					: selected
@@ -139,17 +141,18 @@ function MessageListRow({
 					className="mt-1 h-4 w-4 rounded border-neutral-300"
 					aria-label={t("list.selectFrom", { sender: party })}
 				/>
-				<Link href={href} onClick={onMessageNavigate} className="min-w-0">
+				<Link href={href} onClick={config.folder === "drafts" ? undefined : onMessageNavigate} aria-current={active ? "true" : undefined} className="min-w-0">
 					<span className="flex items-baseline justify-between gap-3">
 						<span className={clsx(unread && "font-semibold",getMessagePartyClassName(rowMessage, config.folder))}>
+							{unread && <span className="sr-only">{t("list.unread")} </span>}
 							{party}
 
 							{(message.threadCount ?? 1) > 1 && (
 								<span className="ml-2 text-xs font-normal text-neutral-500">{message.threadCount}</span>
 							)}
 						</span>
-						<span className={clsx(unread ?"font-medium":"text-neutral-400","shrink-0 text-[11px]")}>
-							{formatMessageListTimestamp(message.createdAt)}
+						<span className={clsx(unread ?"font-medium":"text-neutral-500","shrink-0 text-[11px]")}>
+							{message.scheduledAt ? formatScheduledSendTime(message.scheduledAt, t) : formatMessageListTimestamp(message.createdAt)}
 						</span>
 					</span>
 					<span
@@ -161,12 +164,16 @@ function MessageListRow({
 					<span className="mt-0.5 block truncate text-xs leading-5 text-neutral-500">
 						{preview}
 					</span>
+					{message.scheduledSequence
+						? <span className="mt-1 block"><SequenceChip name={message.scheduledSequence} /></span>
+						: message.scheduledCondition === "no_reply" && <span className="mt-1 block"><IfNoReplyChip label={t("schedule.ifNoReply")} /></span>}
 				</Link>
 			</div>
 		);
 		if (!swipeable) return compactRow;
 		return (
 			<SwipeableRow
+				role="listitem"
 				startAction={{
 					label: read ? t("list.markUnread") : t("list.markRead"),
 					icon: read ? Mail : MailOpen,
@@ -186,7 +193,7 @@ function MessageListRow({
 	}
 
 	const className =
-		`group relative grid min-h-12 w-full grid-cols-[24px_32px_minmax(160px,260px)_1fr_auto] items-center gap-3 px-6 text-left text-sm hover:z-10 hover:bg-[#f2f6fc] hover:shadow-sm ${active || selected ? "bg-blue-50" : ""
+		`group relative grid min-h-12 w-full grid-cols-[24px_32px_minmax(160px,80px)_1fr_auto] items-center gap-3 px-6 text-left text-sm hover:z-10 hover:bg-[#f2f6fc] hover:shadow-sm has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset has-[a:focus-visible]:ring-blue-600 ${active || selected ? "bg-blue-50" : ""
 		} ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`;
 	const content = (
 		<>
@@ -196,12 +203,12 @@ function MessageListRow({
 						type="button"
 						variant="ghost"
 						size="sm"
-						onClick={(event) => {
-							event.preventDefault();
-							event.stopPropagation();
+						className="relative z-10"
+						onClick={() => {
 							void toggleMessageStar(message.id).then((result) => setStarred(result.starred));
 						}}
-						aria-label={starred ? t("list.starred") : t("list.notStarred")}
+						aria-label={t("message.star")}
+						aria-pressed={starred}
 					>
 						<Icon className={`h-4 w-4 ${starred ? "fill-amber-400 text-amber-400" : "text-neutral-300"}`} />
 					</Button>
@@ -211,6 +218,7 @@ function MessageListRow({
 				<Icon className="h-4 w-4 text-neutral-300" />
 			)}
 			<span className={clsx(unread && "font-semibold", getMessagePartyClassName(rowMessage, config.folder))}>
+				{unread && <span className="sr-only">{t("list.unread")} </span>}
 				{party}
 
 				{(message.threadCount ?? 1) > 1 && (
@@ -218,39 +226,48 @@ function MessageListRow({
 				)}
 			</span>
 			<span className="truncate text-neutral-700">
-				<span className={unread ? "font-semibold text-neutral-900" : ""}>
-					{rowMessage.subject ?? t("list.noSubject")}
-				</span>
-				<span className="text-neutral-500"> - {getMessagePreview(rowMessage, config.folder, t)}</span>
+				<Link
+					href={href}
+					onClick={config.folder === "drafts" ? undefined : onMessageNavigate}
+					aria-current={active ? "true" : undefined}
+					className="focus-visible:outline-none after:absolute after:inset-0"
+				>
+					{message.scheduledSequence
+						? <SequenceChip name={message.scheduledSequence} />
+						: message.scheduledCondition === "no_reply" && <IfNoReplyChip label={t("schedule.ifNoReply")} />}
+					<span className={unread ? "font-semibold text-neutral-900" : ""}>
+						{rowMessage.subject ?? t("list.noSubject")}
+					</span>
+					<span className="text-neutral-500"> - {getMessagePreview(rowMessage, config.folder, t)}</span>
+				</Link>
 			</span>
 			<time
 				dateTime={message.createdAt}
 				className={`min-w-[96px] whitespace-nowrap text-right text-xs group-hover:opacity-0 ${unread ? "font-semibold text-neutral-800" : "text-neutral-500"
 					}`}
 			>
-				{formatMessageListTimestamp(message.createdAt)}
+				{message.scheduledAt ? formatScheduledSendTime(message.scheduledAt, t) : formatMessageListTimestamp(message.createdAt)}
 			</time>
 		</>
 	);
 
 	if (config.folder === "drafts") {
 		return (
-			<div className={className}>
+			<div role="listitem" className={className}>
 				<Checkbox
 					checked={selected}
 					onChange={(event) => onSelectedChange(message.id, event.target.checked)}
-					className="h-4 w-4 rounded border-neutral-300"
+					className="relative z-10 h-4 w-4 rounded border-neutral-300"
 					aria-label={t("list.selectMessage")}
 				/>
-				<Link href={href} className="contents text-left">
-					{content}
-				</Link>
+				{content}
 			</div>
 		);
 	}
 
 	return (
 		<div
+			role="listitem"
 			className={className}
 			draggable={draggable}
 			onDragStart={(event) => {
@@ -262,12 +279,10 @@ function MessageListRow({
 			<Checkbox
 				checked={selected}
 				onChange={(event) => onSelectedChange(message.id, event.target.checked)}
-				className="h-4 w-4 rounded border-neutral-300"
-				aria-label={t("list.selectMessage")}
+				className="relative z-10 h-4 w-4 rounded border-neutral-300"
+				aria-label={t("list.selectFrom", { sender: party })}
 			/>
-			<Link href={href} onClick={onMessageNavigate} className="contents">
-				{content}
-			</Link>
+			{content}
 			{(config.folder === "inbox" || config.folder === "snoozed") && message.direction === "inbound" && (
 				<MessageListRowActions
 					message={rowMessage}
@@ -295,6 +310,7 @@ export function MessageFolderPage({
 	>([]);
 	const [pendingBulkAction, setPendingBulkAction] = useState(false);
 	const [emptyingFolder, setEmptyingFolder] = useState(false);
+	const [actionError, setActionError] = useState<string | null>(null);
 	const [unreadOnly, setUnreadOnly] = useState(false);
 	const [conversationView] = useConversationView();
 	const grouped = conversationView && config.folder !== "drafts";
@@ -342,6 +358,13 @@ export function MessageFolderPage({
 	}, [offset]);
 
 	useEffect(() => {
+		const originalTitle = document.title;
+		return () => {
+			document.title = originalTitle;
+		};
+	}, []);
+
+	useEffect(() => {
 		if (mailboxesLoading) return;
 		document.title = formatEmailPageTitle({
 			location: title,
@@ -351,6 +374,19 @@ export function MessageFolderPage({
 			emailAddress: mailboxAddress,
 		});
 	}, [title, config.folder, config.folderId, mailboxAddress, mailboxesLoading, titleTotal, titleUnread]);
+
+	useEffect(() => {
+		if (isLoading) return;
+		setSelectedMessages((current) => {
+			const remaining = current.filter((item) => messages.some((message) => message.id === item.id));
+			return remaining.length === current.length ? current : remaining;
+		});
+	}, [messages, isLoading]);
+
+	useEffect(() => {
+		if (isLoading || offset === 0 || messages.length > 0) return;
+		setOffset(total > 0 ? Math.floor((total - 1) / limit) * limit : 0);
+	}, [isLoading, offset, messages.length, total, limit]);
 
 	function updateSelectedMessage(messageId: string, selected: boolean) {
 		const message = messages.find((item) => item.id === messageId);
@@ -391,6 +427,21 @@ export function MessageFolderPage({
 			window.alert(t("list.emptyFailed", { folder: getPermanentDeleteFolderLabel(permanentDeleteFolder, t) }));
 		} finally {
 			setEmptyingFolder(false);
+		}
+	}
+
+	useEffect(() => {
+		if (!actionError) return;
+		const timer = setTimeout(() => setActionError(null), 6000);
+		return () => clearTimeout(timer);
+	}, [actionError]);
+
+	async function runSelectedActionReportingErrors(action: BulkMessageAction, folderId?: string) {
+		setActionError(null);
+		try {
+			await runSelectedAction(action, folderId);
+		} catch {
+			setActionError(t("actions.error.update"));
 		}
 	}
 
@@ -437,6 +488,7 @@ export function MessageFolderPage({
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			<div className={`flex h-14 shrink-0 items-center justify-between border-b border-neutral-200 ${compact ? "px-4" : "px-4.5 md:px-6"}`}>
+				{selectedMessageId ? <h2 className="sr-only">{title}</h2> : <h1 className="sr-only">{title}</h1>}
 				<div className="flex items-center gap-3 w-full">
 					<Tooltip label={t("list.selectAll")}>
 						<Checkbox
@@ -451,14 +503,14 @@ export function MessageFolderPage({
 						<BulkMessageToolbar
 							selectedCount={selectedIds.length}
 							hasUnreadSelection={hasUnreadSelection}
-							onAction={runSelectedAction}
+							onAction={runSelectedActionReportingErrors}
 							onClearSelection={() => setSelectedMessages([])}
 							pending={pendingBulkAction}
 							folder={config.folderId ? undefined : config.folder}
 						/>
 					) : (
 						(compact || isMobile) && (
-							<h1 className="truncate font-semibold text-neutral-900 pl-1">{title}</h1>
+							<p aria-hidden="true" className="truncate font-semibold text-neutral-900 pl-1">{title}</p>
 						)
 					)}
 				</div>
@@ -527,23 +579,35 @@ export function MessageFolderPage({
 				)}
 			</div>
 
-			<div className="min-h-0 flex-1 divide-y divide-neutral-100 overflow-y-auto overscroll-contain scrollbar-gutter-stable">
-				{messages.map((message) => (
-					<MessageListRow
-						key={message.id}
-						message={message}
-						config={config}
-						selected={selectedIds.includes(message.id)}
-						active={message.id === selectedMessageId}
-						compact={compact || isMobile}
-						currentAccountName={currentAccountName}
-						onSelectedChange={updateSelectedMessage}
-						onMessageAction={(messageId, action) =>
-							runBulkMessageAction(expandSelectedIds([messageId]), action, action !== "read" && action !== "unread")
-						}
-						dragMessageIds={expandSelectedIds(selectedIds.includes(message.id) ? selectedIds : [message.id])}
-					/>
-				))}
+			{actionError && (
+				<p role="alert" className="shrink-0 border-b border-red-100 bg-red-50 px-6 py-2 text-sm font-medium text-red-700">
+					{actionError}
+				</p>
+			)}
+
+			<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-gutter-stable">
+				<div role="list" aria-label={title} className="divide-y divide-neutral-100">
+					{messages.map((message) => (
+						<MessageListRow
+							key={message.id}
+							message={message}
+							config={config}
+							selected={selectedIds.includes(message.id)}
+							active={message.id === selectedMessageId}
+							compact={compact || isMobile}
+							currentAccountName={currentAccountName}
+							onSelectedChange={updateSelectedMessage}
+							onMessageAction={(messageId, action) => {
+								setActionError(null);
+								return runBulkMessageAction(expandSelectedIds([messageId]), action, action !== "read" && action !== "unread").catch((error) => {
+									setActionError(t("actions.error.update"));
+									throw error;
+								});
+							}}
+							dragMessageIds={expandSelectedIds(selectedIds.includes(message.id) ? selectedIds : [message.id])}
+						/>
+					))}
+				</div>
 				{!isLoading && messages.length === 0 && (
 					<p className="px-6 py-4 text-sm text-neutral-500">
 						{hasActiveFilters ? t("list.noMatch") : config.emptyTextKey ? t(config.emptyTextKey) : config.emptyText}
@@ -551,5 +615,25 @@ export function MessageFolderPage({
 				)}
 			</div>
 		</div>
+	);
+}
+
+/** Gmail-style label on a scheduled email that is a step of a sequence. */
+function SequenceChip({ name }: { name: string }) {
+	return (
+		<span className="mr-2 inline-flex max-w-40 items-center gap-1 rounded bg-neutral-200 px-1.5 py-px align-middle text-xs text-neutral-700">
+			<ListOrdered className="h-3 w-3 shrink-0" aria-hidden />
+			<span className="truncate">{name}</span>
+		</span>
+	);
+}
+
+/** Marks a scheduled send that is skipped if they reply first. */
+function IfNoReplyChip({ label }: { label: string }) {
+	return (
+		<span className="mr-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 align-middle text-[11px] font-semibold text-blue-700">
+			<Undo2 className="h-3 w-3" aria-hidden />
+			{label}
+		</span>
 	);
 }

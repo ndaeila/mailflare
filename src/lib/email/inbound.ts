@@ -1,13 +1,15 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { getDb } from "@/db";
-import { messages, users } from "@/db/schema";
+import { messages, outboundJobs, users } from "@/db/schema";
 import { newId } from "@/lib/ids";
 import { buildSnippet, parseRawMime } from "@/lib/email/parse";
 import { resolveInboundAddress, resolveInboxRuleDestination } from "@/lib/email/routing";
 import { dispatchWebhooks } from "@/lib/email/webhooks";
 import { getMessageContactNames, upsertContactFromAddress } from "@/lib/contacts/service";
 import { getEmailAddress } from "@/lib/email/address";
-import { sendMailboxAutoReply } from "@/lib/email/auto-reply";
+import { isAutomatedMessage, sendMailboxAutoReply } from "@/lib/email/auto-reply";
+import { handleInboundReply } from "@/lib/email/reply-handlers";
+import { parseSendCondition } from "@/lib/email/send-conditions";
 import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
 import { listMessageAttachments, storeMessageAttachments } from "@/lib/email/attachments";
 import { inboundAttachmentLimitReason } from "@/lib/email/inbound-attachments";
@@ -213,6 +215,15 @@ export async function processInboundMessage(
 		}
 	}
 
+	// A real reply (not spam, not an auto-responder) stops "unless they reply" sends.
+	if (status !== "spam" && !isAutomatedMessage(getEmailAddress(fromAddr) ?? fromAddr, payload.headers)) {
+		try {
+			await handleInboundReply(env, { mailboxId: decision.mailbox.mailboxId, threadId, fromAddr, receivedAt: new Date() });
+		} catch (error) {
+			console.error(`Reply handling failed for ${messageId}`, error);
+		}
+	}
+
 	if (status !== "spam") {
 		const notificationUserIds = await getMailboxNotificationUserIds(
 			env,
@@ -268,7 +279,13 @@ export async function getMessageWithBody(env: CloudflareEnv, userId: string, mes
 	const contactNames = await getMessageContactNames(env, userId, message.fromAddr, message.toAddr);
 	const attachments = await listMessageAttachments(env, messageId);
 	const unsubscribeUrl = await getUnsubscribeUrlFromRawR2Key(env, message.rawR2Key);
-	return { message: { ...message, ...contactNames }, body: message, attachments, unsubscribeUrl };
+	return {
+		message: { ...message, ...contactNames },
+		body: message,
+		attachments,
+		unsubscribeUrl,
+		...(await getScheduledSendInfo(db, message)),
+	};
 }
 
 export async function getMessageWithBodyForUser(env: CloudflareEnv, user: SessionUser, messageId: string) {
@@ -280,7 +297,24 @@ export async function getMessageWithBodyForUser(env: CloudflareEnv, user: Sessio
 	const contactNames = await getMessageContactNames(env, message.userId, message.fromAddr, message.toAddr);
 	const attachments = await listMessageAttachments(env, messageId);
 	const unsubscribeUrl = await getUnsubscribeUrlFromRawR2Key(env, message.rawR2Key);
-	return { message: { ...message, ...contactNames }, body: message, attachments, unsubscribeUrl };
+	return {
+		message: { ...message, ...contactNames },
+		body: message,
+		attachments,
+		unsubscribeUrl,
+		...(await getScheduledSendInfo(db, message)),
+	};
+}
+
+/** When a queued outbound message is scheduled to go out, and its condition; nulls otherwise. */
+async function getScheduledSendInfo(db: ReturnType<typeof getDb>, message: Pick<typeof messages.$inferSelect, "id" | "direction" | "status">): Promise<{ scheduledAt: string | null; scheduledCondition: string | null }> {
+	if (message.direction !== "outbound" || message.status !== "queued") return { scheduledAt: null, scheduledCondition: null };
+	const [job] = await db
+		.select({ scheduledAt: outboundJobs.scheduledAt, sendCondition: outboundJobs.sendCondition })
+		.from(outboundJobs)
+		.where(and(eq(outboundJobs.messageId, message.id), eq(outboundJobs.status, "queued"), isNotNull(outboundJobs.scheduledAt)))
+		.limit(1);
+	return { scheduledAt: job?.scheduledAt?.toISOString() ?? null, scheduledCondition: parseSendCondition(job?.sendCondition)?.type ?? null };
 }
 
 export async function getMessageMetadataForUser(env: CloudflareEnv, user: SessionUser, messageId: string) {

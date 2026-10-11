@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import {
 	Bold,
@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { EmailHtmlRenderer } from "@/components/messages/email-html-renderer";
 import { sanitizeEmailHtml, sanitizeEditorHtml } from "@/lib/email/html";
 import type { RichTextEditorProps, ToolbarCommand } from "./rich-text-editor-types";
+import { fieldsFromEditorHtml, fieldsToEditorHtml, mergeFieldChipHtml } from "./merge-field-utils";
+import { focusEditableEnd } from "./phone-keyboard-utils";
 
 const COMMANDS: ToolbarCommand[] = [
 	{ command: "bold", labelKey: "editor.bold", icon: Bold },
@@ -46,6 +48,10 @@ export function RichTextEditor({
 	toolbarStart,
 	toolbarEnd,
 	footerContent,
+	mergeFieldLabel,
+	editorApi,
+	mobileToolbarExtra,
+	phoneToolbarOpen = false,
 }: RichTextEditorProps) {
 	const { t } = useLanguage();
 	const editorRef = useRef<HTMLDivElement | null>(null);
@@ -54,19 +60,27 @@ export function RichTextEditor({
 	const [linkUrl, setLinkUrl] = useState("");
 	const [showQuoted, setShowQuoted] = useState(false);
 	const savedRange = useRef<Range | null>(null);
+	const rootRef = useRef<HTMLDivElement | null>(null);
+	const lastRange = useRef<Range | null>(null);
+	const labelRef = useRef(mergeFieldLabel);
+	useLayoutEffect(() => { labelRef.current = mergeFieldLabel; }, [mergeFieldLabel]);
+	const mergeEnabled = !!mergeFieldLabel;
 
 	// Keep the DOM in step with the value without resetting the caret on every keystroke.
 	useEffect(() => {
 		const element = editorRef.current;
 		if (!element) return;
-		const safeValue = sanitizeEditorHtml(value);
+		const label = labelRef.current;
+		const safeValue = sanitizeEditorHtml(label ? fieldsToEditorHtml(value, label) : value);
 		if (element.innerHTML !== safeValue) element.innerHTML = safeValue;
-	}, [value]);
+	}, [value, mergeEnabled]);
 
 	useEffect(() => {
 		function refresh() {
 			const element = editorRef.current;
 			if (!element || !element.contains(document.activeElement)) return;
+			const selection = window.getSelection();
+			if (selection && selection.rangeCount > 0 && element.contains(selection.anchorNode)) lastRange.current = selection.getRangeAt(0).cloneRange();
 			const next: Record<string, boolean> = {};
 			for (const item of COMMANDS) {
 				if (item.command === "formatBlock") {
@@ -83,8 +97,27 @@ export function RichTextEditor({
 
 	function emit() {
 		// Export validated original resource addresses, never the blocked preview placeholders.
-		onChange(sanitizeEmailHtml(editorRef.current?.innerHTML ?? "", { forOutgoing: true }) ?? "");
+		const html = sanitizeEmailHtml(editorRef.current?.innerHTML ?? "", { forOutgoing: true }) ?? "";
+		onChange(labelRef.current ? fieldsFromEditorHtml(html) : html);
 	}
+
+	useImperativeHandle(editorApi, () => ({
+		insertField(name: string) {
+			const element = editorRef.current;
+			const label = labelRef.current;
+			if (!element || !label) return;
+			element.focus();
+			const selection = window.getSelection();
+			if (lastRange.current && selection && element.contains(lastRange.current.startContainer)) {
+				selection.removeAllRanges();
+				selection.addRange(lastRange.current);
+			}
+			document.execCommand("insertHTML", false, mergeFieldChipHtml(name, label(name)));
+			document.execCommand("insertText", false, " ");
+			emit();
+		},
+	}));
+
 
 	function run(command: string, commandValue?: string) {
 		editorRef.current?.focus();
@@ -136,8 +169,12 @@ export function RichTextEditor({
 	}
 
 	return (
-		<div className={cn("flex min-h-0 flex-1 flex-col", className)}>
-			<div className="relative min-h-0 flex-1 overflow-y-auto">
+		<div
+			ref={rootRef}
+			className={cn("flex min-h-0 flex-1 flex-col", className)}
+		>
+			{/* A tap anywhere in the empty space below the text starts writing, as in Gmail. */}
+			<div className="relative min-h-0 flex-1 overflow-y-auto max-md:flex max-md:flex-col" onClick={(event) => { if (event.target === event.currentTarget && !disabled) focusEditableEnd(editorRef.current); }}>
 				<div
 					ref={editorRef}
 					id={id}
@@ -152,8 +189,11 @@ export function RichTextEditor({
 					onPaste={onPaste}
 					onKeyDown={onKeyDown}
 					className={cn(
-						"email-body max-w-none px-4 py-3 text-sm text-neutral-900 outline-none",
+						"email-body max-w-none px-4 py-3 text-sm text-neutral-900 outline-none max-md:text-base",
 						"min-h-32 empty:before:pointer-events-none empty:before:text-neutral-400 empty:before:content-[attr(data-placeholder)]",
+						// Phones: fill the area so a tap anywhere lands on the editor itself; iOS only raises the
+						// keyboard for a tap on the field, not for focus set from code afterwards.
+						!quotedHtml && "max-md:flex-1",
 						disabled && "cursor-not-allowed opacity-60",
 					)}
 				/>
@@ -163,6 +203,7 @@ export function RichTextEditor({
 							type="button"
 							onClick={() => setShowQuoted((open) => !open)}
 							aria-expanded={showQuoted}
+							aria-label={showQuoted ? t("editor.hideQuoted") : t("editor.showQuoted")}
 							className="rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs leading-5 text-neutral-500 hover:bg-neutral-200"
 							title={showQuoted ? t("editor.hideQuoted") : t("editor.showQuoted")}
 						>
@@ -175,8 +216,16 @@ export function RichTextEditor({
 				)}
 			</div>
 			{footerContent}
-			<div className="relative flex items-center gap-0.5 border-t border-neutral-100 px-4 py-3">
-				{toolbarStart}
+			<div
+				// mousedown, not pointerdown: cancelling pointerdown on iOS still lets the tap take focus from the editor.
+				onMouseDown={(event) => { if ((event.target as HTMLElement).closest("button")) event.preventDefault(); }}
+				className={cn(
+					"relative flex items-center gap-0.5 border-t border-neutral-100 px-4 py-3",
+					phoneToolbarOpen && !disabled ? "max-md:order-first max-md:flex max-md:gap-0.5 max-md:overflow-x-auto max-md:border-b max-md:border-t-0 max-md:px-1 max-md:py-1 max-md:[scrollbar-width:none]" : "max-md:hidden",
+				)}
+			>
+				<span className="contents max-md:hidden">{toolbarStart}</span>
+				{mobileToolbarExtra && <span className="contents md:hidden">{mobileToolbarExtra}</span>}
 				{COMMANDS.map((item) => (
 					<Tooltip key={item.command} label={t(item.labelKey)}>
 						<button
@@ -187,11 +236,11 @@ export function RichTextEditor({
 							onMouseDown={(event) => event.preventDefault()}
 							onClick={() => run(item.command, item.value)}
 							className={cn(
-								"rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900",
+								"shrink-0 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 max-md:rounded-full max-md:p-2.5 max-md:text-neutral-800",
 								active[item.command] && "bg-neutral-200 text-neutral-900",
 							)}
 						>
-							<item.icon className="h-4 w-4" />
+							<item.icon className="h-4 w-4 max-md:h-5 max-md:w-5" />
 						</button>
 					</Tooltip>
 				))}
@@ -202,9 +251,9 @@ export function RichTextEditor({
 						disabled={disabled}
 						onMouseDown={(event) => event.preventDefault()}
 						onClick={openLink}
-						className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+						className="shrink-0 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 max-md:rounded-full max-md:p-2.5 max-md:text-neutral-800"
 					>
-						<Link2 className="h-4 w-4" />
+						<Link2 className="h-4 w-4 max-md:h-5 max-md:w-5" />
 					</button>
 				</Tooltip>
 				<Tooltip label={t("editor.clearFormatting")}>
@@ -214,12 +263,12 @@ export function RichTextEditor({
 						disabled={disabled}
 						onMouseDown={(event) => event.preventDefault()}
 						onClick={() => run("removeFormat")}
-						className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+						className="shrink-0 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 max-md:rounded-full max-md:p-2.5 max-md:text-neutral-800"
 					>
-						<RemoveFormatting className="h-4 w-4" />
+						<RemoveFormatting className="h-4 w-4 max-md:h-5 max-md:w-5" />
 					</button>
 				</Tooltip>
-				{toolbarEnd}
+				<span className="contents max-md:hidden">{toolbarEnd}</span>
 				{linkOpen && (
 					<form
 						className="absolute bottom-full left-2 z-10 mb-1 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg"
@@ -236,6 +285,7 @@ export function RichTextEditor({
 								if (event.key === "Escape") setLinkOpen(false);
 							}}
 							placeholder="https://example.com"
+							aria-label={t("editor.insertLink")}
 							className="h-8 w-64 rounded-md border border-neutral-200 px-2 text-sm outline-none focus:border-blue-400"
 						/>
 						<button type="submit" className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">

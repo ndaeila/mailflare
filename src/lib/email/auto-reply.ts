@@ -76,6 +76,11 @@ export async function sendMailboxAutoReply(
 		});
 }
 
+/** True for bounces, list mail and auto-responders (out-of-office and similar). */
+export function isAutomatedMessage(sender: string, headers?: Record<string, string>): boolean {
+	return shouldSkipAutoReply(sender, headers);
+}
+
 function shouldSkipAutoReply(recipient: string, headers?: Record<string, string>): boolean {
 	const localPart = recipient.slice(0, recipient.indexOf("@"));
 	if (/^(mailer-daemon|postmaster|no-?reply|do-?not-?reply)$/i.test(localPart)) return true;

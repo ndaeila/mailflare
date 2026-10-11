@@ -3,6 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+	--color-neutral-500: #6b6b6b;
 	--background: #f6f8fc;
 	--foreground: #202124;
 	--card: #ffffff;
@@ -145,6 +146,19 @@ pre {
 .email-body p {
 	margin: 0 0 0.5rem;
 }
+/* Sequence mail-merge fields in the composer, like Gmail's merge tags. */
+.mf-merge-field {
+	display: inline-block;
+	border-radius: 6px;
+	background: var(--color-neutral-200);
+	color: var(--color-neutral-800);
+	padding: 0 6px;
+	font-size: 0.92em;
+	font-weight: 500;
+	line-height: 1.5;
+	cursor: default;
+	user-select: all;
+}
 .email-quote-toggle {
 	margin-top: 1.4em;
 }
@@ -209,8 +223,8 @@ button {
 	--color-neutral-100: #35363a;
 	--color-neutral-200: #3c4043;
 	--color-neutral-300: #5f6368;
-	--color-neutral-400: #80868b;
-	--color-neutral-500: #9aa0a6;
+	--color-neutral-400: #9aa0a6;
+	--color-neutral-500: #a8aeb4;
 	--color-neutral-600: #bdc1c6;
 	--color-neutral-700: #dadce0;
 	--color-neutral-800: #e8eaed;
@@ -458,7 +472,8 @@ button {
 .dark .bg-\[\#f6f8fc\], .dark .bg-\[\#f7f9fc\] { background-color: #202124; }
 .dark .bg-\[\#f2f6fc\], .dark .bg-\[\#f1f4fa\], .dark .bg-\[\#f0f3f9\] { background-color: #303134; }
 .dark .bg-\[\#eef3fb\], .dark .bg-\[\#eaf1fb\], .dark .bg-\[\#e6ecf6\] { background-color: #383a3e; }
-.dark .hover\:bg-\[\#f2f6fc\]:hover { background-color: #35363a; }
+.dark .hover\:bg-\[\#f2f6fc\]:hover,
+.dark .bg-\[\#f2f6fc\] { background-color: #35363a; }
 .dark .hover\:bg-\[\#e6ecf6\]:hover { background-color: #3c4043; }
 /* Soft shadows turn dark */
 .dark .shadow-neutral-200, .dark .shadow-neutral-300 { --tw-shadow-color: rgb(0 0 0 / 0.6); }
@@ -475,5 +490,58 @@ button {
 @media (max-width: 767px) {
 	.page-flush :is(.bg-white.p-6, .bg-white.p-5) {
 		padding-inline: 0;
+	}
+}
+
+/* ── Phone sheets ────────────────────────────────────────────────────────────
+   Gmail's iOS compose: the sheet slides up from the bottom while the page behind shrinks into a
+   dimmed, rounded card (body.mf-sheet-open is set by the composer). Swiping down or closing slides
+   it away again. Dialog-based sheets (template and sequence editors) use the same motion. */
+@keyframes mf-sheet-in {
+	from { transform: translateY(100%); }
+	to { transform: translateY(0); }
+}
+@keyframes mf-sheet-out {
+	from { transform: translateY(0); }
+	to { transform: translateY(100%); }
+}
+@media (max-width: 767px) {
+	.mf-app-root {
+		transform-origin: 50% 0;
+		/* !important: the root's inline transition-duration is for the desktop sidebar. */
+		transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 360ms, filter 360ms !important;
+	}
+	html:has(body.mf-sheet-open),
+	body.mf-sheet-open {
+		background: #000;
+		overflow: hidden;
+		overscroll-behavior: none;
+	}
+	/* A scroller inside a sheet that reaches its end must not hand the drag on to the page. */
+	.mf-sheet,
+	.mf-sheet * {
+		overscroll-behavior: contain;
+	}
+	body.mf-sheet-open .mf-app-root {
+		transform: translateY(8px) scale(0.93);
+		/* Follows Safari's keyboard pan instantly (not animated with transform), so the card stays put. */
+		translate: 0 var(--mf-vv-top, 0px);
+		border-radius: 14px;
+		overflow: hidden;
+		filter: brightness(0.8);
+	}
+	.mf-sheet {
+		animation: mf-sheet-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+		transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+	.mf-sheet.mf-sheet-closing {
+		transform: translateY(100%) !important;
+		transition: transform 260ms cubic-bezier(0.4, 0, 1, 1) !important;
+	}
+	.mf-sheet[data-state="open"] {
+		animation: mf-sheet-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	}
+	.mf-sheet[data-state="closed"] {
+		animation: mf-sheet-out 240ms cubic-bezier(0.4, 0, 1, 1) both;
 	}
 }

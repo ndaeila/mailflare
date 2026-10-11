@@ -21,7 +21,7 @@ export function SettingsNav() {
 						<h2 className="px-4 text-xs font-semibold uppercase tracking-wide text-neutral-500">
 							{t(section.labelKey)}
 						</h2>
-						<nav className="space-y-px">
+						<nav aria-label={t(section.labelKey)} className="space-y-px">
 							{section.items.map((item) => {
 								const active = isActiveSettingsPath(pathname, item.href);
 								return (

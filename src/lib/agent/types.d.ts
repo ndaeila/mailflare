@@ -12,6 +12,8 @@ export type AgentDraftEditInput = {
 	subject?: string;
 	body?: string;
 	scheduledAt?: string | null;
+	/** With scheduledAt: skip the send if anyone in the thread or a recipient replies first. */
+	cancelIfReply?: boolean;
 	addAttachments?: { sourceEmailId: string; attachmentId: string }[];
 	removeAttachmentIds?: string[];
 };

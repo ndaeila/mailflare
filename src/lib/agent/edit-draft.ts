@@ -19,7 +19,7 @@ function recipientHeader(value: string, label: string, required: boolean): strin
 }
 
 export async function editAgentDraft(context: AgentToolContext, input: AgentDraftEditInput) {
-	if (![input.from, input.to, input.cc, input.bcc, input.subject, input.body, input.scheduledAt, input.addAttachments?.length, input.removeAttachmentIds?.length].some((value) => value !== undefined && value !== 0)) throw new Error("Provide at least one draft change");
+	if (![input.from, input.to, input.cc, input.bcc, input.subject, input.body, input.scheduledAt, input.cancelIfReply, input.addAttachments?.length, input.removeAttachmentIds?.length].some((value) => value !== undefined && value !== 0)) throw new Error("Provide at least one draft change");
 	const db = getDb(context.env);
 	const access = await getMailboxAccessLevel(db, context.user, context.mailboxId);
 	if (!access?.canSendOnBehalf) throw new Error("You cannot edit drafts in this mailbox");
@@ -48,7 +48,7 @@ export async function editAgentDraft(context: AgentToolContext, input: AgentDraf
 		additions.push({ filename: found.attachment.filename, type: found.attachment.contentType, content: await found.object.arrayBuffer() });
 	}
 	if (remaining.length + additions.length > MAX_ATTACHMENT_COUNT || remaining.reduce((total, attachment) => total + attachment.size, 0) + additions.reduce((total, attachment) => total + attachment.content.byteLength, 0) > MAX_TOTAL_ATTACHMENT_SIZE) throw new Error("Draft attachments exceed the allowed count or total size");
-	const [updated] = await db.update(agentDraftMetadata).set({ revision: sql`${agentDraftMetadata.revision} + 1`, ...(scheduledAt !== undefined ? { scheduledAt } : {}) }).where(and(eq(agentDraftMetadata.draftId, draft.id), eq(agentDraftMetadata.revision, input.expectedRevision))).returning({ revision: agentDraftMetadata.revision, scheduledAt: agentDraftMetadata.scheduledAt });
+	const [updated] = await db.update(agentDraftMetadata).set({ revision: sql`${agentDraftMetadata.revision} + 1`, ...(scheduledAt !== undefined ? { scheduledAt } : {}), ...(input.cancelIfReply !== undefined ? { sendCondition: input.cancelIfReply ? "no_reply" : null } : {}) }).where(and(eq(agentDraftMetadata.draftId, draft.id), eq(agentDraftMetadata.revision, input.expectedRevision))).returning({ revision: agentDraftMetadata.revision, scheduledAt: agentDraftMetadata.scheduledAt, sendCondition: agentDraftMetadata.sendCondition });
 	if (!updated) throw new Error("Draft changed; read it again before editing");
 	if (additions.length) await storeMessageAttachments(context.env, draft.id, additions);
 	for (const attachmentId of removeIds) await deleteMessageAttachment(context.env, draft.id, attachmentId);
@@ -57,5 +57,5 @@ export async function editAgentDraft(context: AgentToolContext, input: AgentDraf
 		subject: input.subject === undefined ? draft.subject : input.subject,
 		...(formattedBody ? { textBody: formattedBody.text, htmlBody: formattedBody.html, snippet: buildSnippet(formattedBody.text, null) } : {}),
 	}).where(eq(messages.id, draft.id));
-	return { draftId: draft.id, revision: updated.revision, status: "draft_updated", scheduledAt: updated.scheduledAt?.toISOString() ?? null, composerUrl: `/drafts/${encodeURIComponent(draft.id)}`, attachmentCount: remaining.length + additions.length };
+	return { draftId: draft.id, revision: updated.revision, status: "draft_updated", scheduledAt: updated.scheduledAt?.toISOString() ?? null, cancelIfReply: updated.sendCondition === "no_reply", composerUrl: `/drafts/${encodeURIComponent(draft.id)}`, attachmentCount: remaining.length + additions.length };
 }

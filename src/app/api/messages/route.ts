@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
+import { parseSendCondition } from "@/lib/email/send-conditions";
 import { eq, desc, and, or, count, isNull, isNotNull, inArray, lte, gt, notInArray, ne, sql, sum } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { getEnv } from "@/lib/cloudflare";
 import { getCurrentUser } from "@/lib/auth/cookies";
 import { getDb } from "@/db";
-import { messages } from "@/db/schema";
+import { messages, outboundJobs, sequenceEnrollments, sequences } from "@/db/schema";
 import { getContactDisplayNameMap } from "@/lib/contacts/service";
 import { getFirstEmailAddressEntry, normalizeEmailAddress } from "@/lib/email/address";
 import { getMailboxAccessLevel, listAccessibleMailboxes } from "@/lib/mailboxes/access";
 import { tracksAccountIdentity } from "@/lib/profile/identity-utils";
 import { buildSearchConditions } from "@/lib/search/conditions";
 import { getRequestTimeZone } from "@/lib/time/utils";
+import { scheduledMessageCondition } from "@/lib/email/scheduled";
 import { getMessageListColumns, loadConversationPage } from "./utils";
 import type { ListMessage } from "./types";
 
@@ -31,6 +33,7 @@ export async function GET(request: Request) {
 	const read = url.searchParams.get("read");
 	const starred = url.searchParams.get("starred");
 	const snoozed = url.searchParams.get("snoozed");
+	const scheduled = url.searchParams.get("scheduled");
 	const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 100);
 	const offset = Math.max(Number(url.searchParams.get("offset") ?? 0), 0);
 	// Conversation view: one row per thread, represented by its newest message
@@ -76,6 +79,9 @@ export async function GET(request: Request) {
 		conditions.push(eq(messages.status, "received"));
 		conditions.push(isNull(messages.folderId));
 		conditions.push(gt(messages.snoozedUntil, new Date()));
+	}
+	if (scheduled === "true") {
+		conditions.push(scheduledMessageCondition(db));
 	}
 	if (read === "read") {
 		conditions.push(eq(messages.read, true));
@@ -154,6 +160,26 @@ export async function GET(request: Request) {
 			if (row.threadId) threadCounts.set(row.threadId, { total: row.total, unread: Number(row.unread ?? 0) });
 		}
 	}
+	const scheduledAtByMessageId = new Map<string, string>();
+	const scheduledConditionByMessageId = new Map<string, string>();
+	const scheduledSequenceByMessageId = new Map<string, string>();
+	if (scheduled === "true" && rows.length > 0) {
+		const jobs = await db
+			.select({ messageId: outboundJobs.messageId, scheduledAt: outboundJobs.scheduledAt, sendCondition: outboundJobs.sendCondition })
+			.from(outboundJobs)
+			.where(and(inArray(outboundJobs.messageId, rows.map((row) => row.id)), eq(outboundJobs.status, "queued"), isNotNull(outboundJobs.scheduledAt)));
+		for (const job of jobs) {
+			if (job.messageId && job.scheduledAt) scheduledAtByMessageId.set(job.messageId, job.scheduledAt.toISOString());
+			const condition = parseSendCondition(job.sendCondition)?.type;
+			if (job.messageId && condition) scheduledConditionByMessageId.set(job.messageId, condition);
+		}
+		const sequenceRows = await db
+			.select({ messageId: sequenceEnrollments.nextMessageId, name: sequences.name })
+			.from(sequenceEnrollments)
+			.innerJoin(sequences, eq(sequences.id, sequenceEnrollments.sequenceId))
+			.where(inArray(sequenceEnrollments.nextMessageId, rows.map((row) => row.id)));
+		for (const row of sequenceRows) if (row.messageId) scheduledSequenceByMessageId.set(row.messageId, row.name);
+	}
 	const mailboxNameMap = new Map(
 		accessibleMailboxes.map((mailbox) => [
 			mailbox.id,
@@ -185,6 +211,9 @@ export async function GET(request: Request) {
 		return {
 			...message,
 			snippet: message.snippet,
+			...(scheduledAtByMessageId.has(message.id) ? { scheduledAt: scheduledAtByMessageId.get(message.id) } : {}),
+			...(scheduledConditionByMessageId.has(message.id) ? { scheduledCondition: scheduledConditionByMessageId.get(message.id) } : {}),
+			...(scheduledSequenceByMessageId.has(message.id) ? { scheduledSequence: scheduledSequenceByMessageId.get(message.id) } : {}),
 			fromContactName:
 				(message.direction === "outbound" ? accountName : null) ??
 				contactMap?.get(normalizeEmailAddress(message.fromAddr)) ??

@@ -12,6 +12,19 @@ export type RichTextEditorProps = {
 	toolbarStart?: React.ReactNode;
 	toolbarEnd?: React.ReactNode;
 	footerContent?: React.ReactNode;
+	/** When set, {{field}} placeholders show as atomic chips with this label and are
+	 * serialized back to {{field}} in onChange (sequence mail merge). */
+	mergeFieldLabel?: (name: string) => string;
+	/** Filled with editor commands the parent can call, e.g. inserting a merge field at the caret. */
+	editorApi?: React.MutableRefObject<RichTextEditorApi | null>;
+	/** Extra buttons for the phone formatting bar (toolbarStart/End are desktop-only there). */
+	mobileToolbarExtra?: React.ReactNode;
+	/** Phones: show the formatting row (toggled by the sheet's Aa button) under the subject. */
+	phoneToolbarOpen?: boolean;
+};
+
+export type RichTextEditorApi = {
+	insertField: (name: string) => void;
 };
 
 export type ToolbarCommand = {

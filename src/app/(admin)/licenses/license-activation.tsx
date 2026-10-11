@@ -88,7 +88,7 @@ export function LicenseActivation({ children }: { children?: ReactNode }) {
 						<Button type="button" variant="outline" className="mt-5" onClick={() => void submit("deactivate")} disabled={action !== null}>
 							{action === "deactivate" ? t("licenses.deactivating") : t("licenses.deactivate")}
 						</Button>
-						{status && <p className="mt-3 text-sm text-neutral-500">{status}</p>}
+						{status && <p role="status" className="mt-3 text-sm text-neutral-500">{status}</p>}
 					</div>
 				</CardContent>
 			</Card>
@@ -171,7 +171,7 @@ export function LicenseActivation({ children }: { children?: ReactNode }) {
 							{action === "activate" ? t("licenses.activating") : t("licenses.activate")}
 						</Button>
 					)}
-					{status && <p className="text-sm text-neutral-500">{status}</p>}
+					{status && <p role="status" className="text-sm text-neutral-500">{status}</p>}
 				</div>
 			</CardContent>
 		</Card>

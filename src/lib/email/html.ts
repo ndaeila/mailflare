@@ -325,7 +325,7 @@ export function prepareEmailHtml(source: string, options: Options = {}) {
 	const cleaned = purifier.sanitize(template.content, {
 		USE_PROFILES: { html: true },
 		ADD_TAGS: ["style", rootTag, bodyTag],
-		ADD_ATTR: ["target", "loading", "referrerpolicy", ...(options.forOutgoing || options.editor ? ["data-mailflare-quote", "data-mailflare-signature"] : []), ...(options.editor ? EDITOR_ATTRIBUTES : [])],
+		ADD_ATTR: ["target", "loading", "referrerpolicy", ...(options.forOutgoing || options.editor ? ["data-mailflare-quote", "data-mailflare-signature", "data-mailflare-field"] : []), ...(options.editor ? [...EDITOR_ATTRIBUTES, "contenteditable"] : [])],
 		FORBID_TAGS: ["script", "iframe", "object", "embed", "form", "input", "button", "select", "textarea", "link", "base", "meta", "audio", "video", "source", "template"],
 		FORBID_ATTR: ["is", "slot"],
 		ALLOW_DATA_ATTR: false,

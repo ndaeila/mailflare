@@ -7,6 +7,8 @@ import { collapseQuotedEmailHtml } from "@/app/(dashboard)/inbox/[messageId]/quo
 
 const BASE_STYLE = `
 :host { display:block; min-width:0; isolation:isolate; contain:paint; }
+:host(.mf-dark) { filter:invert(1) hue-rotate(180deg); }
+:host(.mf-dark) img, :host(.mf-dark) video, :host(.mf-dark) picture { filter:invert(1) hue-rotate(180deg); }
 .email-quote-toggle { margin-top:1.4em; }
 .email-quote-toggle > summary { cursor:pointer; list-style:none; width:26px; border-radius:20px; background:#ececec; text-align:center; }
 .email-quote-toggle > summary::-webkit-details-marker { display:none; }
@@ -18,10 +20,21 @@ export function EmailHtmlRenderer({ html, className, preserveLeadingQuote = fals
 	html: string; className?: string; preserveLeadingQuote?: boolean;
 }) {
 	const { t } = useLanguage();
+	const quoteToggleLabel = t("message.quote.toggle");
 	const host = useRef<HTMLDivElement>(null);
 	const [allowedSource, setAllowedSource] = useState<string | null>(null);
 	const [hasRemote, setHasRemote] = useState(false);
 	const allowRemote = allowedSource === html;
+	// Mail is authored for white paper. Under the dark theme it is inverted
+	// (images inverted back) instead of glaring as a white slab.
+	useEffect(() => {
+		const root = document.documentElement;
+		const sync = () => host.current?.classList.toggle("mf-dark", root.classList.contains("dark"));
+		sync();
+		const observer = new MutationObserver(sync);
+		observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+		return () => observer.disconnect();
+	}, []);
 	useEffect(() => {
 		if (!host.current) return;
 		host.current.dir = document.documentElement.dir || "ltr";
@@ -29,9 +42,9 @@ export function EmailHtmlRenderer({ html, className, preserveLeadingQuote = fals
 		const prepared = prepareEmailHtml(html, { reader: true, allowRemote });
 		setHasRemote(prepared.hasRemote);
 		const base = document.createElement("style");
-		base.textContent = `${BASE_STYLE}\n${prepared.rootTag} { display:block; font:14px/1.5 Arial,sans-serif; color:#202124; background:#fff; color-scheme:light; }\n${prepared.bodyTag} { display:block; }`;
+		base.textContent = `${BASE_STYLE}\n${prepared.rootTag} { display:block; font:14px/1.5 Arial,sans-serif; color:#202124; background:#fff; color-scheme:light; }\n${prepared.bodyTag} { display:block; }\n:host(.mf-dark) ${prepared.rootTag} { background:transparent; }`;
 		const content = document.createElement("template");
-		content.innerHTML = collapseQuotedEmailHtml(prepared.html, preserveLeadingQuote) ?? "";
+		content.innerHTML = collapseQuotedEmailHtml(prepared.html, preserveLeadingQuote, quoteToggleLabel) ?? "";
 		root.replaceChildren(base, content.content);
 		const mailBody = root.querySelector(prepared.bodyTag);
 		// An LTR scroller cannot reach left-side overflow from an RTL email.
@@ -51,7 +64,7 @@ export function EmailHtmlRenderer({ html, className, preserveLeadingQuote = fals
 		};
 		root.addEventListener("click", navigate);
 		return () => root.removeEventListener("click", navigate);
-	}, [html, allowRemote, preserveLeadingQuote]);
+	}, [html, allowRemote, preserveLeadingQuote, quoteToggleLabel]);
 	return <div className={`min-w-0 max-w-full ${className ?? ""}`}>
 		{hasRemote && <div className="mb-2 flex justify-end">
 			<button type="button" aria-pressed={allowRemote} className="rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50"

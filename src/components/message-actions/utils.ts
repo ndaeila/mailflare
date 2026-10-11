@@ -121,12 +121,9 @@ export function getMoveMessageActions(
 
 export function getMessageActionRedirect(
   action: BulkMessageAction,
-  direction: "inbound" | "outbound",
+  listHref: string,
 ) {
-  if (action === "trash") return "/trash";
-  if (action === "spam") return "/spam";
-  if (action === "archive") return "/archived";
-  if (action === "inbox") return "/inbox";
+  if (action === "trash" || action === "spam" || action === "archive" || action === "inbox") return listHref;
   return null;
 }
 

@@ -18,7 +18,7 @@ export function getMessageParty(
 	t: Translator = defaultTranslator,
 ) {
 	if (folder === "drafts") return t("list.draft");
-	if (folder === "sent") return formatRecipientSummary(message.toAddr, message.toContactName, t);
+	if (folder === "sent" || folder === "scheduled") return formatRecipientSummary(message.toAddr, message.toContactName, t);
 	if (message.direction === "outbound" && currentAccountName) return currentAccountName;
 	return message.fromContactName ?? (message.fromAddr ? getEmailDisplayName(message.fromAddr) : t("list.unknownSender"));
 }

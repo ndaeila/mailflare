@@ -13,7 +13,9 @@ export type ComposeDraft = {
 	threadId?: string | null;
 	/** Files already stored on the draft, e.g. carried over by Forward. */
 	attachments?: ComposeStoredAttachment[];
-	agent?: { revision: number; origin: "chat" | "auto" | "mcp"; scheduledAt: string | null } | null;
+	agent?: { revision: number; origin: "chat" | "auto" | "mcp"; scheduledAt: string | null; sendCondition?: string | null } | null;
+	/** Set when this draft was a scheduled send that was skipped because someone replied. */
+	skippedSend?: { reason: "reply"; from: string; at: string } | null;
 };
 
 export type ComposeStoredAttachment = {

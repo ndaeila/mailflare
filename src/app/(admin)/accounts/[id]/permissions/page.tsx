@@ -197,7 +197,7 @@ export default function AccountPermissionsPage() {
 					</div>
 				</section>
 			)}
-			{message && <p className="text-sm text-neutral-500">{message}</p>}
+			{message && <p role="status" className="text-sm text-neutral-500">{message}</p>}
 
 			<Dialog open={transferOpen} onOpenChange={setTransferOpen}>
 				<DialogContent className="w-[min(420px,calc(100vw-32px))]">

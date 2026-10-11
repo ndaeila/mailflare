@@ -148,7 +148,11 @@ export function AdminUpdateCard() {
 								</button>
 							)}
 						</div>
+					</div>
+				)}
 
+				{(isCheckingMigrations || migrationStatus) && (
+					<div className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-100">
 						{isCheckingMigrations && (
 							<div className="flex items-center gap-3 px-4 py-4">
 								<Skeleton className="h-4 w-4 rounded-full" />
@@ -179,6 +183,13 @@ export function AdminUpdateCard() {
 								{t("update.deployMatching")}
 							</div>
 						)}
+
+						{!isCheckingMigrations && migrationStatus?.ready && (
+							<div className="flex items-center gap-3 px-4 py-4">
+								<CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+								<p className="text-sm text-neutral-700">{t("update.databaseUpToDate")}</p>
+							</div>
+						)}
 					</div>
 				)}
 
@@ -192,8 +203,8 @@ export function AdminUpdateCard() {
 						)}
 					</p>
 				)}
-				{error && <p className="text-sm text-red-600">{error}</p>}
-				{migrationError && <p className="text-sm text-red-600">{migrationError}</p>}
+				{error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+				{migrationError && <p role="alert" className="text-sm text-red-600">{migrationError}</p>}
 			</CardContent>
 		</Card>
 	);

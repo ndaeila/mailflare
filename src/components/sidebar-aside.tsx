@@ -49,7 +49,7 @@ export function MobileTopBar({ title }: { title?: string }) {
 	return (
 		<div className="flex h-16 shrink-0 items-center gap-2 pl-2 md:hidden">
 			<MobileMenuButton />
-			{title && <h2 className="min-w-0 max-w-[40vw] truncate text-base font-medium text-neutral-900">{title}</h2>}
+			{title && <p aria-hidden="true" className="min-w-0 max-w-[40vw] truncate text-base font-medium text-neutral-900">{title}</p>}
 		</div>
 	);
 }

@@ -1,11 +1,13 @@
 "use client";
 
-import { createElement, useState, useMemo, useCallback } from "react";
+import { createElement, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Ban, BellOff, Clock, FileCode2, Forward, Mail, MailOpen, MoreVertical, Reply, ReplyAll, ShieldAlert, Trash2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { useCompose } from "@/components/compose/compose-context";
 import { MessageSourceDialog } from "@/components/messages/message-source-dialog";
+import { useDismissible } from "@/components/use-dismissible";
+import { useMessageListVisibility } from "@/components/messages/message-list-visibility";
 import { MessageSnoozeDialog } from "./message-snooze-dialog";
 import { useIsMobile } from "@/components/sidebar-mobile-utils";
 import { useHotkeys, useShortcuts } from "@/components/shortcuts";
@@ -50,12 +52,15 @@ export function MessageActions({
 	const router = useRouter();
 	const isMobile = useIsMobile();
 	const { openDraftComposer } = useCompose();
+	const { backHref: listHref } = useMessageListVisibility();
 	const { shortcutsEnabled } = useShortcuts();
 	const [pendingAction, setPendingAction] = useState<
 		BulkMessageAction | "unsubscribe" | ReplyMode | "forward" | "block" | null
 	>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [moreOpen, setMoreOpen] = useState(false);
+	const moreRef = useRef<HTMLDivElement>(null);
+	useDismissible(moreOpen, () => setMoreOpen(false), moreRef);
 	const [sourceOpen, setSourceOpen] = useState(false);
 	const [snoozeOpen, setSnoozeOpen] = useState(false);
 
@@ -65,7 +70,7 @@ export function MessageActions({
 		setError(null);
 		try {
 			await runSingleMessageAction(messageId, action);
-			const redirect = getMessageActionRedirect(action, direction);
+			const redirect = getMessageActionRedirect(action, listHref);
 			if (redirect) router.push(redirect);
 			router.refresh();
 		} catch {
@@ -73,7 +78,7 @@ export function MessageActions({
 		} finally {
 			setPendingAction(null);
 		}
-	}, [messageId, direction, router, t]);
+	}, [messageId, listHref, router, t]);
 
 	// In Trash and Spam the delete button removes the message for good instead of
 	// being a no-op, after the user confirms.
@@ -237,7 +242,7 @@ export function MessageActions({
 		try {
 			await blockMessageContact({ mailboxId, senderAddress });
 			await runSingleMessageAction(messageId, "trash");
-			router.push("/trash");
+			router.push(listHref);
 			router.refresh();
 		} catch (blockError) {
 			setError(blockError instanceof Error ? blockError.message : t("message.error.block"));
@@ -252,7 +257,7 @@ export function MessageActions({
 
 	return (
 		<div className="flex flex-wrap items-center gap-3 text-neutral-600 flex-1 min-w-0">
-			{error && <span className="text-xs text-red-600">{error}</span>}
+			{error && <span role="alert" className="text-xs text-red-600">{error}</span>}
 
 			{isMobile && (
 				<>
@@ -379,7 +384,7 @@ export function MessageActions({
 			</Tooltip>
 				</>
 			)}
-			<div className="relative">
+			<div ref={moreRef} className="relative">
 				<Tooltip label={t("common.moreActions")}>
 					<Button
 						type="button"

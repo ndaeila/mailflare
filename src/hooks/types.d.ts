@@ -1,6 +1,6 @@
 export type MessageStatus = "received" | "sent" | "draft" | "queued" | "failed" | "archived" | "trash" | "spam";
 
-export type MessageFolder = "inbox" | "starred" | "snoozed" | "sent" | "drafts" | "archived" | "trash" | "spam";
+export type MessageFolder = "inbox" | "starred" | "snoozed" | "sent" | "scheduled" | "drafts" | "archived" | "trash" | "spam";
 
 export type MessageDirection = "inbound" | "outbound";
 
@@ -27,6 +27,12 @@ export type Message = {
 	read: boolean;
 	starred: boolean;
 	snoozedUntil?: string | null;
+	/** When a scheduled send will go out; set on rows in the Scheduled list. */
+	scheduledAt?: string | null;
+	/** Condition on a scheduled send, e.g. "no_reply". */
+	scheduledCondition?: string | null;
+	/** Name of the sequence this scheduled email is a step of. */
+	scheduledSequence?: string | null;
 	threadId: string | null;
 	inReplyTo?: string | null;
 	references?: string | null;

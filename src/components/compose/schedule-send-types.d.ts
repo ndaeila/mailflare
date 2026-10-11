@@ -9,7 +9,17 @@ export type ScheduleSendMenuProps = {
 	disabled?: boolean;
 	value: Date | null;
 	onChange: (value: Date | null) => void;
+	/** Schedule the email for this time right away (Gmail-style). */
+	onScheduleSend: (value: Date, options: ScheduleSendOptions) => void;
+	cancelIfReply?: boolean;
 	mailboxId?: string | null;
 	from: string;
 	onApplyTemplate: (template: { title: string; html: string }) => void;
+	/** The email being written, for "Save this email as a template". */
+	currentEmail?: { subject: string; html: string };
+};
+
+export type ScheduleSendOptions = {
+	/** Skip the send if a recipient replies (or anyone replies in the thread) first. */
+	cancelIfReply: boolean;
 };

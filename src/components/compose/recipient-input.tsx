@@ -25,6 +25,7 @@ export function RecipientInput({
 	required,
 	autoFocus,
 	trailing,
+	className,
 }: RecipientInputProps) {
 	const { t } = useLanguage();
 	const [draft, setDraft] = useState("");
@@ -52,10 +53,10 @@ export function RecipientInput({
 
 	return (
 		<div
-			className="flex min-h-9 items-center gap-2 border-b border-neutral-100 px-4 py-1"
+			className={cn("flex min-h-9 items-center gap-2 border-b border-neutral-100 px-4 py-1 max-md:min-h-12", className)}
 			onClick={() => inputRef.current?.focus()}
 		>
-			<Label htmlFor={id} className="w-8 shrink-0 text-sm text-neutral-500">
+			<Label htmlFor={id} className="w-8 shrink-0 text-sm text-neutral-500 max-md:w-12 max-md:text-base">
 				{label}
 			</Label>
 			<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -77,7 +78,7 @@ export function RecipientInput({
 								<button
 									type="button"
 									aria-label={t("recipient.remove", { address: getEmailAddress(entry) })}
-									className="rounded-full p-0.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+									className="rounded-full p-0.5 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700"
 									onClick={(event) => {
 										event.stopPropagation();
 										onChange(value.filter((item) => item !== entry));
@@ -111,13 +112,13 @@ export function RecipientInput({
 					disabled={disabled}
 					// Native `required` would block submit while chips exist; the form checks itself.
 					aria-required={required}
-					className="h-7 min-w-32 flex-1 border-0 bg-transparent p-0 text-sm outline-none placeholder:text-neutral-400 disabled:cursor-not-allowed"
+					className="h-7 min-w-32 flex-1 border-0 bg-transparent p-0 text-sm outline-none max-md:h-9 max-md:text-base max-md:placeholder:text-transparent placeholder:text-neutral-400 disabled:cursor-not-allowed"
 				/>
 			</div>
 			{trailing && (
 				// Toggles live inside the clickable row; keep their clicks from refocusing this field.
 				<div
-					className="flex shrink-0 items-center gap-1 text-xs text-neutral-500"
+					className="flex shrink-0 items-center gap-1 text-xs text-neutral-500 max-md:text-sm"
 					onClick={(event) => event.stopPropagation()}
 				>
 					{trailing}

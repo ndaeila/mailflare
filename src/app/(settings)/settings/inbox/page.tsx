@@ -14,6 +14,7 @@ export default async function SettingsInboxPage() {
 	const t = await getServerTranslator();
 	return (
 		<div className="space-y-8 py-4">
+			<h1 className="sr-only">{t("settings.nav.inbox")}</h1>
 			<section className="space-y-4">
 				<div>
 					<h2 className="text-xl font-semibold text-neutral-900">{t("settingsPage.inbox.experience")}</h2>

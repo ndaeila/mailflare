@@ -378,8 +378,10 @@ export const outboundJobs = sqliteTable("outbound_jobs", {
 		.notNull()
 		.references(() => users.id, { onDelete: "cascade" }),
 	messageId: text("message_id").references(() => messages.id, { onDelete: "set null" }),
-	status: text("status", { enum: ["queued", "sent", "failed"] }).notNull().default("queued"),
+	status: text("status", { enum: ["queued", "sending", "sent", "failed", "skipped"] }).notNull().default("queued"),
 	payload: text("payload").notNull(),
+	/** JSON SendCondition (lib/email/send-conditions-types); null sends unconditionally. */
+	sendCondition: text("send_condition"),
 	error: text("error"),
 	scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
 	createdAt: integer("created_at", { mode: "timestamp" })
@@ -402,6 +404,58 @@ export const emailTemplates = sqliteTable(
 		updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 	},
 	(t) => [index("email_templates_user_idx").on(t.userId)],
+);
+
+/** A reusable outreach sequence: an opening email plus follow-ups (JSON SequenceStep[], lib/sequences/types). */
+export const sequences = sqliteTable(
+	"sequences",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		steps: text("steps").notNull().default("[]"),
+		archivedAt: integer("archived_at", { mode: "timestamp" }),
+		createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+		updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+	},
+	(t) => [index("sequences_user_idx").on(t.userId)],
+);
+
+/** One recipient going through a sequence. Steps are copied at enrollment so edits to
+ * this person's emails, or to the sequence later, never collide. Only the next step
+ * exists as a real scheduled message at any time (next_message_id). */
+export const sequenceEnrollments = sqliteTable(
+	"sequence_enrollments",
+	{
+		id: text("id").primaryKey(),
+		sequenceId: text("sequence_id").notNull().references(() => sequences.id, { onDelete: "cascade" }),
+		userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+		mailboxId: text("mailbox_id").notNull().references(() => mailboxes.id, { onDelete: "cascade" }),
+		fromAddr: text("from_addr").notNull(),
+		toAddr: text("to_addr").notNull(),
+		ccAddr: text("cc_addr"),
+		/** JSON string[]: lower-cased recipient addresses whose mail counts as a reply. */
+		addresses: text("addresses").notNull().default("[]"),
+		variables: text("variables").notNull().default("{}"),
+		steps: text("steps").notNull().default("[]"),
+		timeZone: text("time_zone").notNull().default("UTC"),
+		status: text("status", { enum: ["active", "replied", "stopped", "finished", "failed"] }).notNull().default("active"),
+		sentSteps: integer("sent_steps").notNull().default(0),
+		nextStep: integer("next_step"),
+		nextMessageId: text("next_message_id"),
+		lastMessageId: text("last_message_id"),
+		lastSentAt: integer("last_sent_at", { mode: "timestamp" }),
+		threadIds: text("thread_ids").notNull().default("[]"),
+		repliedAt: integer("replied_at", { mode: "timestamp" }),
+		repliedFrom: text("replied_from"),
+		createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+		updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+	},
+	(t) => [
+		index("sequence_enrollments_sequence_idx").on(t.sequenceId, t.status),
+		index("sequence_enrollments_mailbox_idx").on(t.mailboxId, t.status),
+		index("sequence_enrollments_next_message_idx").on(t.nextMessageId),
+	],
 );
 
 export const calendarEvents = sqliteTable(
@@ -803,6 +857,8 @@ export const agentDraftMetadata = sqliteTable("agent_draft_metadata", {
 	revision: integer("revision").notNull().default(1),
 	humanEditedAt: integer("human_edited_at", { mode: "timestamp" }),
 	scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+	/** Send condition type for the scheduled send, e.g. "no_reply". */
+	sendCondition: text("send_condition"),
 	createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -886,6 +942,8 @@ export const schema = {
 	sharedAttachmentLinks,
 	outboundJobs,
 	emailTemplates,
+	sequences,
+	sequenceEnrollments,
 	calendarEvents,
 	bookingEvents,
 	routingRules,

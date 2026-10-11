@@ -1,5 +1,6 @@
 import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 import { z } from "zod";
+import { scheduledMessageCondition } from "@/lib/email/scheduled";
 import { getDb } from "@/db";
 import { agentDraftMetadata, domains, mailboxes, messages } from "@/db/schema";
 import { buildSnippet } from "@/lib/email/parse";
@@ -24,10 +25,10 @@ const body = z.string().trim().min(1).max(40_000).describe("The recipient-facing
 const limit = z.number().int().min(1).max(50).default(20);
 
 export const emailToolSchemas = {
-	list_emails: z.object({ folder: z.enum(["inbox", "sent", "draft", "archived", "trash", "spam"]).default("inbox"), limit, cursor: id.optional() }),
+	list_emails: z.object({ folder: z.enum(["inbox", "sent", "scheduled", "draft", "archived", "trash", "spam"]).default("inbox"), limit, cursor: id.optional() }),
 	get_email: z.object({ emailId: id }),
 	get_thread: z.object({ emailId: id }),
-	search_emails: z.object({ query: z.string().trim().min(1).max(300), folder: z.enum(["inbox", "sent", "draft", "archived", "trash", "spam"]).optional(), limit }),
+	search_emails: z.object({ query: z.string().trim().min(1).max(300), folder: z.enum(["inbox", "sent", "scheduled", "draft", "archived", "trash", "spam"]).optional(), limit }),
 	draft_email: z.object({ to: z.string().email(), subject: z.string().trim().min(1).max(500), body }),
 	draft_reply: z.object({ emailId: id, body, replyAll: z.boolean().default(false) }),
 	edit_draft: z.object({
@@ -36,6 +37,8 @@ export const emailToolSchemas = {
 		cc: z.string().max(2_000).nullable().optional(), bcc: z.string().max(2_000).nullable().optional(),
 		subject: z.string().max(500).optional(), body: z.string().max(40_000).optional(),
 		scheduledAt: z.string().max(40).nullable().optional(),
+		/** With scheduledAt: skip the send if anyone in the thread or a recipient replies first. */
+		cancelIfReply: z.boolean().optional(),
 		addAttachments: z.array(z.object({ sourceEmailId: id, attachmentId: id })).max(10).optional(),
 		removeAttachmentIds: z.array(id).max(10).optional(),
 	}),
@@ -53,7 +56,7 @@ export const emailToolDescriptions: Record<EmailToolName, string> = {
 	search_emails: "Search email subject and body in this mailbox.",
 	draft_email: "Save a new email draft. This never sends.",
 	draft_reply: "Save a reply draft with recipients and threading derived from the source email. This never sends.",
-	edit_draft: "Update a draft created by the assistant in the selected mailbox. First read it with get_email to get its current revision and attachment IDs. Can change sender, recipients, subject, body, requested schedule, and copy or remove attachments from accessible emails. Use an ISO 8601 send time with timezone offset; null clears it. This never sends or schedules delivery by itself.",
+	edit_draft: "Update a draft created by the assistant in the selected mailbox. First read it with get_email to get its current revision and attachment IDs. Can change sender, recipients, subject, body, requested schedule, and copy or remove attachments from accessible emails. Use an ISO 8601 send time with timezone offset; null clears it. Set cancelIfReply to skip the scheduled send if anyone in the thread or a recipient replies first (for follow-ups). This never sends or schedules delivery by itself.",
 	review_draft_send: "Create a review link for the current assistant draft revision. The user must explicitly confirm before the email is sent or scheduled. This tool never sends or queues an email.",
 	mark_email_read: "Mark an email as read or unread.",
 	move_email: "Move an email to inbox, archive, trash, or spam.",
@@ -125,6 +128,7 @@ export async function runEmailTool(context: AgentToolContext, name: EmailToolNam
 		const conditions = [eq(messages.mailboxId, context.mailboxId)];
 		if (folder === "draft") conditions.push(eq(messages.status, "draft"), eq(messages.userId, context.user.id));
 		else if (folder === "sent") conditions.push(eq(messages.status, "sent"));
+		else if (folder === "scheduled") conditions.push(scheduledMessageCondition(db));
 		else if (folder === "inbox") conditions.push(eq(messages.status, "received"), isNull(messages.folderId));
 		else if (folder === "archived" || folder === "trash" || folder === "spam") conditions.push(eq(messages.status, folder));
 		else conditions.push(or(eq(messages.userId, context.user.id), eq(messages.direction, "inbound"))!);
@@ -141,8 +145,8 @@ export async function runEmailTool(context: AgentToolContext, name: EmailToolNam
 		const row = await ownMessage(context, input.emailId as string);
 		const attachments = await listMessageAttachments(context.env, row.id);
 		const text = (row.textBody || htmlToReadableText(row.htmlBody)).slice(0, 30_000);
-		const [metadata] = row.status === "draft" ? await db.select({ revision: agentDraftMetadata.revision, scheduledAt: agentDraftMetadata.scheduledAt }).from(agentDraftMetadata).where(eq(agentDraftMetadata.draftId, row.id)).limit(1) : [];
-		return { ...publicMessage(row), ...(row.status === "draft" ? { bcc: row.bccAddr, revision: metadata?.revision ?? null, scheduledAt: metadata?.scheduledAt?.toISOString() ?? null } : {}), text, truncated: (row.textBody || row.htmlBody || "").length > 30_000, attachments: attachments.map(({ id, filename, size, type }) => ({ id, filename, size, contentType: type })) };
+		const [metadata] = row.status === "draft" ? await db.select({ revision: agentDraftMetadata.revision, scheduledAt: agentDraftMetadata.scheduledAt, sendCondition: agentDraftMetadata.sendCondition }).from(agentDraftMetadata).where(eq(agentDraftMetadata.draftId, row.id)).limit(1) : [];
+		return { ...publicMessage(row), ...(row.status === "draft" ? { bcc: row.bccAddr, revision: metadata?.revision ?? null, scheduledAt: metadata?.scheduledAt?.toISOString() ?? null, cancelIfReply: metadata?.sendCondition === "no_reply" } : {}), text, truncated: (row.textBody || row.htmlBody || "").length > 30_000, attachments: attachments.map(({ id, filename, size, type }) => ({ id, filename, size, contentType: type })) };
 	}
 	if (name === "get_thread") {
 		const anchor = await ownMessage(context, input.emailId as string);
