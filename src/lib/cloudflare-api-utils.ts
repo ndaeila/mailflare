@@ -63,6 +63,10 @@ export function getCloudflareAuthHint(errors: CfApiError[], path = "") {
 	return " Verify CF_TOKEN with `curl https://api.cloudflare.com/client/v4/user/tokens/verify -H \"Authorization: Bearer <token>\"`. Use the token secret value without `Bearer`, or use CF_API_KEY plus CF_EMAIL for a Global API Key.";
 }
 
-export function getEmailWorkerName(): string {
-	return "mailflare";
+/**
+ * Worker that Email Routing rules deliver to. Defaults to "mailflare"; a second
+ * instance deployed under another Worker name sets the EMAIL_WORKER_NAME var.
+ */
+export function getEmailWorkerName(env?: Pick<CloudflareEnv, "EMAIL_WORKER_NAME">): string {
+	return env?.EMAIL_WORKER_NAME?.trim() || "mailflare";
 }

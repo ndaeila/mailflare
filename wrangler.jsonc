@@ -112,4 +112,42 @@
 			},
 		],
 	},
+	// Separate After Hours IT instance: deploy with CLOUDFLARE_ENV=afterhours.
+	"env": {
+		"afterhours": {
+			"name": "mailflare-afterhours",
+			"vars": { "EMAIL_WORKER_NAME": "mailflare-afterhours" },
+			"routes": [
+				{ "pattern": "mail.afterhours.it.com", "custom_domain": true },
+				{ "pattern": "mail.afterhoursit.llc", "custom_domain": true },
+			],
+			"images": { "binding": "IMAGES" },
+			"services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "mailflare-afterhours" }],
+			"durable_objects": { "bindings": [{ "name": "REALTIME", "class_name": "RealtimeHub" }] },
+			"migrations": [{ "tag": "v1", "new_sqlite_classes": ["RealtimeHub"] }],
+			"triggers": { "crons": ["0 2 * * *", "*/5 * * * *"] },
+			"ratelimits": [
+				{ "name": "LOGIN_RATE_LIMIT", "namespace_id": "1201", "simple": { "limit": 20, "period": 60 } },
+				{ "name": "AGENT_RATE_LIMIT", "namespace_id": "1202", "simple": { "limit": 120, "period": 60 } },
+			],
+			"send_email": [{ "name": "EMAIL" }],
+			"ai": { "binding": "AI", "remote": true },
+			"d1_databases": [
+				{ "binding": "DB", "database_name": "mailflare-afterhours", "database_id": "0301ea85-d4cc-48d4-8a5f-7da3f8bc0741", "migrations_dir": "drizzle/migrations" },
+			],
+			"r2_buckets": [{ "binding": "BUCKET", "bucket_name": "mailflare-afterhours-raw" }],
+			"queues": {
+				"producers": [
+					{ "binding": "INBOUND_QUEUE", "queue": "mailflare-afterhours-inbound" },
+					{ "binding": "OUTBOUND_QUEUE", "queue": "mailflare-afterhours-outbound" },
+					{ "binding": "AGENT_QUEUE", "queue": "mailflare-afterhours-agent" },
+				],
+				"consumers": [
+					{ "queue": "mailflare-afterhours-inbound", "max_batch_size": 5, "max_retries": 3 },
+					{ "queue": "mailflare-afterhours-outbound", "max_batch_size": 5, "max_retries": 3 },
+					{ "queue": "mailflare-afterhours-agent", "max_batch_size": 1, "max_retries": 3 },
+				],
+			},
+		},
+	},
 }
